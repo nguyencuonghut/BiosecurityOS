@@ -84,6 +84,44 @@
 
 ## 2. CẤU TRÚC SOURCE CODE
 
+### 2.0 Cấu trúc gốc (monorepo)
+
+```
+BiosecurityOS/
+├── docker-compose.yml           # Dev: tất cả services (1 lệnh docker compose up)
+├── docker-compose.prod.yml      # Prod override: resource limits, restart policy, TLS
+├── .env.example                 # Template biến môi trường
+├── .env                         # Biến môi trường thực (git-ignored)
+├── Makefile                     # Shortcuts: make up, make down, make migrate, make seed, make logs
+│
+├── backend/                     # FastAPI application
+│   ├── Dockerfile               # Multi-stage: builder → runner (python:3.12-slim)
+│   ├── pyproject.toml
+│   └── app/
+│
+├── frontend/                    # Vue.js 3 SPA
+│   ├── Dockerfile               # Multi-stage: node build → nginx serve
+│   ├── nginx.conf               # Reverse proxy /api → backend:8000
+│   └── src/
+│
+├── nginx/                       # (Prod) Reverse proxy + TLS termination
+│   ├── nginx.conf
+│   └── certs/                   # TLS certificates (git-ignored)
+│
+├── n8n/                         # n8n workflow backup
+│   └── workflows/               # Exported JSON workflows
+│
+├── scripts/
+│   ├── init-db.sh               # Chạy migration + seed khi container postgres lần đầu
+│   ├── backup-db.sh             # pg_dump cron script
+│   └── restore-db.sh            # Restore từ backup
+│
+├── docs/
+│   └── requirements_and_designs/
+│
+└── README.md
+```
+
 ### 2.1 Backend (FastAPI latest)
 
 > **⚠️ LƯU Ý QUAN TRỌNG — Tránh pattern cũ của FastAPI:**
@@ -216,8 +254,7 @@ backend/
 │   └── e2e/                     # End-to-end scenarios
 │
 ├── pyproject.toml               # Dependencies, linting config
-├── Dockerfile
-└── docker-compose.yml
+└── Dockerfile                   # Multi-stage build
 ```
 
 ### 2.2 Frontend (Vue.js 3 + JavaScript + PrimeVue 4)
@@ -328,7 +365,8 @@ frontend/
 ├── package.json
 ├── jsconfig.json
 ├── vite.config.js
-└── Dockerfile
+├── Dockerfile                   # Multi-stage: node build → nginx serve
+└── nginx.conf                   # SPA fallback + reverse proxy /api
 ```
 
 ---
@@ -413,7 +451,7 @@ Phase A ──→ Phase B ──→ Phase C ──→ Phase D
 
 | # | Task | FR/NFR | Output | Acceptance Criteria |
 |---|------|--------|--------|---------------------|
-| B01.1 | Setup FastAPI project skeleton | — | `main.py`, `config.py`, `database.py`, Docker Compose (Postgres, Redis, MinIO) | `docker compose up` chạy thành công, healthcheck `/health` trả 200 |
+| B01.1 | Setup project skeleton + Docker Compose | — | `docker-compose.yml`, `.env.example`, Makefile, Backend Dockerfile, Frontend Dockerfile, `main.py`, `config.py`, `database.py` | `make up` → tất cả 6 services healthy, `curl localhost:8000/health` trả 200 |
 | B01.2 | Implement Alembic migration | — | Alembic config + initial migration từ V001 SQL | `alembic upgrade head` tạo đủ tables trong `biosec` schema |
 | B01.3 | Seed reference data | — | Seed script tương đương V002 | Roles, permissions, lookup_code, killer_metric_definition có dữ liệu |
 | B01.4 | Module `auth`: Login / Refresh / Logout | FR-34, NFR-07 | `POST /auth/login`, `/refresh`, `/logout`, `GET /auth/me` | JWT access (1h) + refresh (7d), bcrypt password hash, token blacklist qua Redis |
@@ -795,7 +833,7 @@ Phase A ──→ Phase B ──→ Phase C ──→ Phase D
 | 12.3 | Bug fix — critical/high | Code fixes | Tất cả P0/P1 bugs resolved |
 | 12.4 | Bug fix — medium/low | Code fixes | P2 resolved, P3 accept/defer |
 | 12.5 | Data migration (nếu có) | Migration script | Dữ liệu cũ import đúng vào hệ thống mới |
-| 12.6 | Production deploy | Running system | Docker Compose / K8s trên production server |
+| 12.6 | Production deploy | Running system | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` trên production server |
 | 12.7 | Monitoring setup | Prometheus + Grafana, Sentry | Alert khi error rate > 1%, P95 > 3s |
 | 12.8 | User training | Training session | Farm managers, experts, admins biết sử dụng |
 | 12.9 | Operation handbook | Tài liệu vận hành | Backup, restore, troubleshooting, escalation |
@@ -884,20 +922,303 @@ Layer 9:  reports
 
 | Env | Mục đích | Cấu hình |
 |-----|---------|----------|
-| **Local** | Dev | Docker Compose: FastAPI (hot-reload) + Vue (HMR) + Postgres + Redis + MinIO |
-| **Staging** | QA + UAT | Docker Compose trên server nội bộ, data gần production |
-| **Production** | Go-live | Docker Compose hoặc K8s (tùy scale), TLS, backup tự động |
+| **Local** | Dev | `docker compose up` — FastAPI (hot-reload) + Vue (HMR) + Postgres + Redis + MinIO + n8n |
+| **Staging** | QA + UAT | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` trên server nội bộ, data gần prod |
+| **Production** | Go-live | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` + TLS + backup cron |
 
-### 8.2 Docker Compose services
+### 8.2 Docker Compose (chi tiết)
+
+#### `docker-compose.yml` (Development)
 
 ```yaml
+version: "3.9"
+
 services:
-  postgres:     # PostgreSQL 15+ with biosec schema
-  redis:        # Redis 7+ for cache/session
-  minio:        # MinIO for object storage
-  backend:      # FastAPI application
-  frontend:     # Nginx serving Vue SPA + reverse proxy to backend
-  n8n:          # n8n for notification workflows
+  # ── DATABASE ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-biosecurity}
+      POSTGRES_USER: ${POSTGRES_USER:-biosec}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-biosec_dev_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-biosec}"]
+      interval: 5s
+      retries: 5
+
+  # ── CACHE ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_dev}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD:-redis_dev}", "ping"]
+      interval: 5s
+      retries: 5
+
+  # ── OBJECT STORAGE ────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_dev}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_dev_2026}
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      retries: 3
+
+  # ── BACKEND (FastAPI) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development           # Dev stage: uvicorn --reload
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-biosec}:${POSTGRES_PASSWORD:-biosec_dev_2026}@postgres:5432/${POSTGRES_DB:-biosecurity}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_dev}@redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_dev}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_2026}
+      MINIO_BUCKET: ${MINIO_BUCKET:-biosec-evidence}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-in-prod}
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app       # Hot-reload: code thay đổi → tự restart
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      retries: 3
+
+  # ── FRONTEND (Vue.js 3 dev server) ───────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development           # Dev stage: vite dev server
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src     # HMR: code thay đổi → tự cập nhật browser
+    depends_on:
+      - backend
+
+  # ── n8n (Notification workflow) ──────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:-n8n_dev_2026}
+      WEBHOOK_URL: http://n8n:5678
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  n8n_data:
+```
+
+#### `docker-compose.prod.yml` (Production override)
+
+```yaml
+# Chạy: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+version: "3.9"
+
+services:
+  backend:
+    build:
+      target: production             # Prod stage: gunicorn + uvicorn worker
+    environment:
+      ENVIRONMENT: production
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  frontend:
+    build:
+      target: production             # Prod stage: nginx serving static build
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/certs:/etc/nginx/certs:ro
+    restart: always
+
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4G
+
+  redis:
+    restart: always
+
+  minio:
+    restart: always
+
+  n8n:
+    restart: always
+```
+
+#### `.env.example`
+
+```bash
+# ── Database
+POSTGRES_DB=biosecurity
+POSTGRES_USER=biosec
+POSTGRES_PASSWORD="Hongha@#2022"
+
+# ── Redis
+REDIS_PASSWORD="Hongha@#2022"
+
+# ── MinIO
+MINIO_ROOT_USER=minio_admin
+MINIO_ROOT_PASSWORD="Hongha@#2022"
+MINIO_BUCKET=biosec-evidence
+
+# ── JWT
+JWT_SECRET_KEY="ee379553c1ed96c8d4a97119cb628ab83c0c043097462b65ad65e499408ad29d"#(openssl rand -hex 32)
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# ── n8n
+N8N_USER=admin
+N8N_PASSWORD="Hongha@#2022"
+
+# ── App
+ENVIRONMENT=development    # development | staging | production
+```
+
+#### Dockerfile — Backend (multi-stage)
+
+```dockerfile
+# ── Stage 1: Base ───────────────────────────────────────────
+FROM python:3.12-slim AS base
+WORKDIR /app
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e ".[dev]"
+COPY . .
+
+# ── Stage 2: Development (uvicorn --reload) ─────────────────
+FROM base AS development
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# ── Stage 3: Production (gunicorn + uvicorn workers) ────────
+FROM base AS production
+RUN pip install gunicorn
+CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+```
+
+#### Dockerfile — Frontend (multi-stage)
+
+```dockerfile
+# ── Stage 1: Dependencies ───────────────────────────────────
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# ── Stage 2: Development (Vite dev server + HMR) ───────────
+FROM deps AS development
+COPY . .
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+# ── Stage 3: Build ──────────────────────────────────────────
+FROM deps AS build
+COPY . .
+RUN npm run build
+
+# ── Stage 4: Production (Nginx serving static files) ────────
+FROM nginx:alpine AS production
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80 443
+```
+
+#### Makefile (dev shortcuts)
+
+```makefile
+.PHONY: up down logs migrate seed reset test lint
+
+up:                              ## Khởi động tất cả services
+	docker compose up -d
+
+up-build:                        ## Build lại images rồi khởi động
+	docker compose up -d --build
+
+down:                            ## Dừng tất cả services
+	docker compose down
+
+reset:                           ## Xóa volumes, khởi tạo lại từ đầu
+	docker compose down -v
+	docker compose up -d --build
+
+logs:                            ## Xem logs realtime
+	docker compose logs -f backend frontend
+
+logs-all:                        ## Xem logs tất cả services
+	docker compose logs -f
+
+migrate:                         ## Chạy DB migration
+	docker compose exec backend alembic upgrade head
+
+seed:                            ## Seed reference data
+	docker compose exec postgres psql -U biosec -d biosecurity -f /docker-entrypoint-initdb.d/V002_seed.sql
+
+test:                            ## Chạy test suite
+	docker compose exec backend pytest --cov=app --cov-report=term-missing
+
+lint:                            ## Lint backend + frontend
+	docker compose exec backend ruff check .
+	docker compose exec frontend npm run lint
+
+shell-be:                        ## SSH vào backend container
+	docker compose exec backend bash
+
+shell-db:                        ## Kết nối psql
+	docker compose exec postgres psql -U biosec -d biosecurity
+
+prod-up:                         ## Deploy production
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+prod-down:                       ## Dừng production
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 ```
 
 ### 8.3 CI/CD Pipeline
@@ -980,9 +1301,9 @@ Mỗi task/story được coi là **Done** khi đáp ứng **tất cả** tiêu 
 
 ### Triển khai
 
-- [ ] Migration script chạy thành công (nếu có schema change)
-- [ ] Docker build thành công
-- [ ] Deploy staging thành công, smoke test pass
+- [ ] Migration script chạy thành công (`make migrate`)
+- [ ] `docker compose up --build` thành công, healthcheck pass tất cả services
+- [ ] Deploy staging: `make prod-up` thành công, smoke test pass
 
 ---
 
@@ -990,16 +1311,19 @@ Mỗi task/story được coi là **Done** khi đáp ứng **tất cả** tiêu 
 
 ### Hạ tầng
 
-- [ ] Production server provisioned, Docker installed
-- [ ] TLS certificate configured (Let's Encrypt hoặc custom)
-- [ ] PostgreSQL production instance, `biosec` schema created
-- [ ] Redis production instance
-- [ ] MinIO production instance, bucket created, access policy
-- [ ] n8n production instance, notification workflows configured
-- [ ] Reverse proxy (Nginx/Caddy) configured: TLS, rate limit, CORS
+- [ ] Production server provisioned, Docker + Docker Compose installed
+- [ ] `.env` file cấu hình đúng cho production (passwords, secrets mạnh)
+- [ ] `make prod-up` chạy thành công, tất cả 6 services healthy
+- [ ] TLS certificate configured (Let's Encrypt hoặc custom) trong `nginx/certs/`
+- [ ] PostgreSQL container healthy, `biosec` schema created
+- [ ] Redis container healthy, password đã set
+- [ ] MinIO container healthy, bucket `biosec-evidence` tạo sẵn, access policy
+- [ ] n8n container healthy, notification workflows imported
+- [ ] Frontend Nginx reverse proxy hoạt động: TLS, rate limit, CORS, `/api` → backend
 - [ ] Monitoring: Prometheus + Grafana dashboards live
 - [ ] Sentry project created, DSN configured
-- [ ] Backup: pg_dump cron job running, tested restore ≥ 1 lần
+- [ ] Backup: `scripts/backup-db.sh` cron job running, tested `scripts/restore-db.sh` ≥ 1 lần
+- [ ] Docker volumes backed up hoặc mounted external storage
 
 ### Dữ liệu
 
