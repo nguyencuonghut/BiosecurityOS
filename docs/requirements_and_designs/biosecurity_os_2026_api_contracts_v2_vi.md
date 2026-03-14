@@ -96,8 +96,11 @@ Response:
 
 ### 2.8 Trạng thái chuẩn
 - `assessment.status`: draft, submitted, reviewed, locked
-- `case.current_status`: new, in_review, prescribed, monitoring, closed
-- `task.status`: new, assigned, in_progress, pending_evidence, pending_review, rejected, completed, closed
+- `case.current_status`: open, triage, in_analysis, actioning, monitoring, closed, cancelled
+- `task.status`: open, accepted, in_progress, pending_review, needs_rework, closed, cancelled
+- `killer_metric_event.status`: open, under_review, contained, closed
+
+**Nguồn chuẩn duy nhất:** SQL schema và bảng `lookup_code`. Xem chi tiết state machine transition rules tại mục 9A trong tài liệu requirements.
 
 ---
 
@@ -122,6 +125,28 @@ Response:
 - Các JSON mẫu trong tài liệu là **contract minh họa**, chưa phải OpenAPI cuối cùng.
 - Tên field trong JSON nên giữ nguyên tiếng Anh để đội kỹ thuật triển khai thống nhất.
 - Mọi enum như `draft`, `reviewed`, `closed`, `approved` nên được chốt lại thành **lookup code** hoặc enum dùng chung trước khi code chính thức.
+
+### 2.11 Optimistic Locking
+
+Các entity có state machine (`assessment`, `risk_case`, `corrective_task`, `killer_metric_event`) hỗ trợ **optimistic locking** qua cột `version`:
+
+- Mọi response GET trả về sẽ bao gồm `version` trong payload và `ETag` header.
+- Khi gọi PATCH hoặc POST thay đổi trạng thái, client phải gửi `If-Match: <version>` header.
+- Nếu version không khớp (người khác đã sửa trước), server trả `409 Conflict`.
+
+### 2.12 Upload Policy
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Loại file cho phép | `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `video/quicktime`, `application/pdf` |
+| Kích thước tối đa ảnh | 50 MB |
+| Kích thước tối đa video | 500 MB |
+| Kích thước tối đa PDF | 20 MB |
+| Rate limit upload | 30 file/phút/user |
+| Quét virus | Bất đồng bộ sau khi finalize, đánh dấu `scan_status` |
+| File evidence đã review | Không được xóa vật lý, chỉ soft delete |
+
+Backend phải validate `mime_type` và `file_size_bytes` tại endpoint `POST /attachments/finalize`. Nếu vi phạm, trả lỗi `ATTACHMENT_POLICY_VIOLATION`.
 
 
 ## 3. Danh mục endpoint theo module
@@ -820,6 +845,8 @@ Các event này có thể được Redis stream / message queue / background wor
 | LESSON_REFERENCE_REQUIRED | Lesson thiếu reference |
 | FLOORPLAN_VERSION_REQUIRED | Scar phải gắn phiên bản sơ đồ |
 | ATTACHMENT_IMMUTABLE | File bằng chứng đã khóa, không được xóa |
+| ATTACHMENT_POLICY_VIOLATION | File vi phạm chính sách upload (sai mime type hoặc vượt kích thước) |
+| OPTIMISTIC_LOCK_CONFLICT | Version không khớp, bản ghi đã bị người khác cập nhật |
 
 ---
 

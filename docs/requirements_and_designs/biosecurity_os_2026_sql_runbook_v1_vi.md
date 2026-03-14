@@ -12,12 +12,14 @@
 ### 1.1 `biosecurity_os_2026_postgres_schema_v1_vi.sql`
 Schema PostgreSQL đầy đủ, gồm:
 - tạo schema `biosec`
-- tạo toàn bộ bảng
+- tạo toàn bộ bảng (bao gồm `app_user_credential` và `app_refresh_token` cho xác thực)
 - comment tiếng Việt cho bảng và cột
 - ràng buộc PK/FK/UNIQUE/CHECK
-- index cơ bản + full-text/JSON GIN index
+- index cơ bản + composite index + full-text/JSON GIN index
 - trigger cập nhật `updated_at`
 - trigger guard cho một số business rule quan trọng
+
+**Lưu ý:** File này và `V001__*.sql` phải luôn giống nhau. Khi sửa schema, chỉ sửa một file rồi copy sang file còn lại.
 
 ### 1.2 `V001__biosecurity_os_2026_init_schema.sql`
 Bản migration khởi tạo tương đương với schema file ở trên, đặt tên theo kiểu Flyway.
@@ -42,8 +44,15 @@ Seed dữ liệu tham chiếu mẫu:
 | `role` | `app_role` | Đồng bộ với `app_user`, dễ đọc khi join |
 | `permission` | `app_permission` | Đồng bộ với `app_role` |
 | *(không có riêng trong ERD)* | `role_permission` | Bảng nối nhiều-nhiều để một role có nhiều permission |
+| `user_credential` | `app_user_credential` | Đồng bộ prefix `app_`, lưu password hash và lockout |
+| `refresh_token` | `app_refresh_token` | Đồng bộ prefix `app_`, lưu refresh token hash cho JWT |
 
 Ngoài các đổi tên trên, phần lớn bảng và cột còn lại bám sát ERD.
+
+Các bổ sung khác so với ERD ban đầu:
+- Cột `version` (integer) đã được thêm vào `assessment`, `risk_case`, `corrective_task`, `killer_metric_event` để hỗ trợ **optimistic locking**.
+- Cột `archived_at` (timestamptz, nullable) đã được thêm vào `risk_case`, `corrective_task`, `scar_record`, `lesson_learned`, `attachment` để hỗ trợ **soft delete**.
+- Cột `created_at` / `updated_at` đã được bổ sung cho các bảng còn thiếu: `farm_route`, `floorplan_version`, `floorplan_marker`, `external_risk_point`, `scorecard_template`, `risk_case`, `corrective_task`, `killer_metric_event`, `scar_record`, `lesson_learned`.
 
 ---
 
@@ -107,14 +116,14 @@ Database draft này **chưa** ép ở tầng DB cho các phần dưới đây; n
 
 2. Logic nghiệp vụ sâu hơn:
    - SLA động theo loại task/case
-   - xác định độ lệch trust score theo cửa sổ thời gian
+   - tính Trust Score theo công thức: `max(0, 100 - |gap| × penalty × severity_factor)` (xem chi tiết FR-09a trong requirements)
    - cross-check watermark/GPS/time của file evidence
    - quy tắc chọn `floorplan_version` đúng theo thời điểm sự kiện
+   - validate polymorphic FK trong `scar_link` và `lesson_reference` (kiểm tra `linked_object_id` tồn tại trong bảng tương ứng với `linked_object_type`)
+   - kiểm tra state machine transition (xem mục 9A trong requirements)
+   - kiểm tra upload policy (mime type whitelist, max file size, rate limit)
 
-3. Soft delete / archive strategy:
-   - migration này chưa thêm `archived_at` cho mọi bảng
-
-4. PostGIS / TimescaleDB:
+3. PostGIS / TimescaleDB:
    - chưa bật trong migration init để giữ MVP dễ chạy
    - nên tách thành migration riêng khi hạ tầng production sẵn sàng
 

@@ -349,6 +349,51 @@ Hệ thống phải tính và hiển thị Trust Score dựa trên độ lệch 
 
 Trust Score phải được thể hiện trên dashboard và là tín hiệu ưu tiên cho hoạt động kiểm tra tiếp theo.
 
+#### FR-09a. Thuật toán Trust Score
+
+**Nguyên lý:** Trust Score đo mức độ trung thực giữa điểm trại tự khai và điểm audit độc lập. Trại khai khống (Self > Audit) bị phạt nặng hơn trại khai thấp hơn thực tế.
+
+**Công thức MVP (Phase 1):**
+
+```
+gap        = self_overall_score - audit_overall_score
+abs_gap    = |gap|
+penalty    = 1.5 nếu gap > 0 (khai khống), 1.0 nếu gap ≤ 0 (khai thấp hơn)
+
+Trust Score = max(0, 100 - abs_gap × penalty × severity_factor)
+```
+
+Trong đó:
+- `severity_factor` mặc định = 1.0 ở Phase 1.
+- Phase 2 có thể bật severity_factor động theo:
+  - +0.5 nếu có item killer-related có gap > 2,
+  - +0.3 nếu overall gap > 30,
+  - +0.2 nếu cùng section bị chênh lệch lặp lại ≥ 2 kỳ liên tiếp.
+
+**Ví dụ minh họa:**
+
+| Self | Audit | Gap | Hướng | Penalty | Severity | Trust Score |
+|------|-------|-----|-------|---------|----------|-------------|
+| 92   | 90    | +2  | khai khống | 1.5 | 1.0 | 97.0 |
+| 60   | 95    | -35 | khai thấp | 1.0 | 1.0 | 65.0 |
+| 95   | 60    | +35 | khai khống | 1.5 | 1.0 | 47.5 |
+| 80   | 80    | 0   | chính xác | 1.0 | 1.0 | 100.0 |
+
+**Mở rộng Phase 2 — Weighted Section Gap:**
+
+```
+section_gaps = {
+    hardware:   |self.hw - audit.hw|   × 0.15,
+    process:    |self.pr - audit.pr|   × 0.25,
+    behavior:   |self.bh - audit.bh|   × 0.35,   ← trọng số cao nhất
+    monitoring: |self.mn - audit.mn|   × 0.25,
+}
+weighted_gap = sum(section_gaps)
+Trust Score  = max(0, 100 - weighted_gap × penalty × severity_factor)
+```
+
+Schema lưu kết quả tại bảng `trust_score_snapshot` với các cột `trust_score`, `absolute_gap_score` và `severity_factor`.
+
 ---
 
 ## 8.3 Quản lý case và phân tích nguyên nhân gốc
@@ -686,54 +731,139 @@ Không phải mọi ghi chú hiện trường đều trở thành tri thức chu
 ### BR-06. Trust Score thấp làm tăng mức ưu tiên kiểm tra độc lập
 Site có độ lệch khai báo cao phải được đưa vào kế hoạch giám sát chặt hơn.
 
+### BR-07. Assessment luôn snapshot phiên bản scorecard template tại thời điểm tạo
+Khi tạo assessment, hệ thống phải ghi nhận `template_id` trỏ tới phiên bản cụ thể của scorecard đang active tại thời điểm đó. Khi scorecard template được cập nhật hoặc tạo version mới, các assessment cũ không bị ảnh hưởng vì chúng đã gắn với version cũ. Điều này đảm bảo tính toàn vẹn khi so sánh điểm lịch sử.
+
+### BR-08. Liên kết polymorphic phải được kiểm tra tính toàn vẹn ở tầng ứng dụng
+Các bảng `scar_link` và `lesson_reference` sử dụng cơ chế polymorphic FK (`linked_object_type` + `linked_object_id`). Do database không thể enforce FK cho dạng này, **application layer bắt buộc phải validate** rằng `linked_object_id` tồn tại trong bảng tương ứng với `linked_object_type` trước khi insert. Backend service phải có unit test bao phủ trường hợp này.
+
+### BR-09. Các thực thể có state machine phải hỗ trợ optimistic locking
+Các bảng `risk_case`, `corrective_task`, `assessment` và `killer_metric_event` phải có cột `version` (integer, tăng mỗi lần update). API phải hỗ trợ `If-Match` / ETag header để tránh race condition khi nhiều người cùng thao tác trên một bản ghi.
+
+---
+
+## 9A. Quy tắc chuyển trạng thái (State Machine)
+
+### 9A.1 Assessment Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> submitted : submit
+    submitted --> reviewed : expert review
+    reviewed --> locked : lock/archive
+    draft --> draft : save draft
+    submitted --> draft : reopen (chỉ khi chưa reviewed)
+```
+
+### 9A.2 Risk Case Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> open
+    open --> triage : phân loại
+    triage --> in_analysis : bắt đầu RCA
+    in_analysis --> actioning : tạo task khắc phục
+    actioning --> monitoring : task hoàn thành, theo dõi
+    monitoring --> closed : xác nhận kết quả
+    open --> cancelled : hủy case
+    triage --> cancelled : hủy case
+    in_analysis --> cancelled : hủy case
+```
+
+### 9A.3 Corrective Task Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> open
+    open --> accepted : người được giao nhận việc
+    accepted --> in_progress : bắt đầu thực hiện
+    in_progress --> pending_review : nộp bằng chứng, chờ review
+    pending_review --> needs_rework : reviewer yêu cầu làm lại
+    pending_review --> closed : reviewer approved + close
+    needs_rework --> in_progress : làm lại
+    open --> cancelled : hủy task
+    accepted --> cancelled : hủy task
+```
+
+### 9A.4 Killer Metric Event Status
+
+```mermaid
+stateDiagram-v2
+    [*] --> open
+    open --> under_review : chuyên gia bắt đầu xem xét
+    under_review --> contained : đã kiểm soát
+    contained --> closed : xác nhận đóng (chỉ khi có case)
+    open --> under_review : auto khi case được tạo
+```
+
 ---
 
 ## 10. Yêu cầu phi chức năng
 
 ## 10.1 Hiệu năng và quy mô
 
-### NFR-01
+### NFR-01. Quy mô
 Hệ thống phải đáp ứng quy mô ban đầu tối thiểu:
 
-- 20 trại,
-- hàng trăm người dùng,
-- hàng nghìn bản ghi đánh giá/tháng,
-- hàng chục nghìn ảnh/video/bằng chứng.
+- 20 trại, có thể mở rộng tới 50 trại mà không cần thay đổi kiến trúc,
+- 100 người dùng đồng thời (concurrent users),
+- 5.000 bản ghi đánh giá/tháng,
+- 50.000 file ảnh/video/bằng chứng tích lũy trong năm đầu tiên.
 
-### NFR-02
-Thời gian tải dashboard thông thường không nên vượt quá 3-5 giây trong điều kiện vận hành bình thường.
+### NFR-02. Hiệu năng
+- Thời gian tải dashboard: ≤ 3 giây (P95) trong điều kiện vận hành bình thường.
+- API response cho thao tác CRUD đơn: ≤ 500ms (P95).
+- API response cho báo cáo tổng hợp/analytics: ≤ 5 giây (P95).
 
-### NFR-03
-Các thao tác nghiệp vụ phổ biến như tạo task, cập nhật trạng thái, mở case, xem ảnh phải có phản hồi hợp lý trên web và thiết bị di động.
+### NFR-03. Phản hồi giao diện
+- Các thao tác nghiệp vụ phổ biến (tạo task, cập nhật trạng thái, mở case, xem ảnh) phải có phản hồi ≤ 1 giây trên web và ≤ 2 giây trên thiết bị di động 4G.
 
 ## 10.2 Khả dụng và an toàn dữ liệu
 
-### NFR-04
+### NFR-04. Sao lưu
 Hệ thống phải có cơ chế sao lưu định kỳ cho:
 
-- cơ sở dữ liệu,
-- object storage,
-- cấu hình hệ thống.
+- cơ sở dữ liệu: sao lưu tự động hàng ngày, giữ ít nhất 30 bản,
+- object storage: replication hoặc sao lưu hàng ngày,
+- cấu hình hệ thống: version control.
 
-### NFR-05
-Hệ thống phải hỗ trợ phục hồi dữ liệu khi xảy ra sự cố.
+### NFR-05. Phục hồi
+- **RPO (Recovery Point Objective):** ≤ 1 giờ — mất tối đa 1 giờ dữ liệu khi xảy ra sự cố.
+- **RTO (Recovery Time Objective):** ≤ 4 giờ — hệ thống phải hoạt động trở lại trong 4 giờ.
 
-### NFR-06
-Dữ liệu bằng chứng và dữ liệu điều tra phải được kiểm soát truy cập chặt chẽ.
+### NFR-06. Kiểm soát truy cập dữ liệu
+Dữ liệu bằng chứng và dữ liệu điều tra phải được kiểm soát truy cập chặt chẽ. File evidence đã qua review không được phép xóa vật lý.
+
+### NFR-06a. Lưu trữ dữ liệu
+- Dữ liệu evidence, case, scar và lesson learned phải được lưu trữ tối thiểu **5 năm**.
+- Audit log phải được lưu trữ tối thiểu **3 năm**.
+- Dữ liệu assessment phải được lưu trữ tối thiểu **5 năm** để phục vụ phân tích xu hướng dài hạn.
+
+### NFR-06b. Khả dụng
+- Uptime mục tiêu: **99.5%** (không tính thời gian bảo trì đã thông báo trước).
 
 ## 10.3 Bảo mật
 
-### NFR-07
+### NFR-07. Xác thực và phân quyền
 Hệ thống phải hỗ trợ:
 
-- xác thực người dùng,
-- phân quyền theo vai trò,
-- mã hóa truyền tải,
-- audit log,
-- kiểm soát phiên đăng nhập.
+- xác thực người dùng bằng JWT (access token + refresh token),
+- phân quyền theo vai trò (RBAC),
+- mã hóa truyền tải (TLS 1.2+),
+- audit log cho mọi thao tác tạo/sửa/xóa/phê duyệt,
+- kiểm soát phiên đăng nhập (session timeout, revoke token),
+- lưu trữ mật khẩu bằng hash an toàn (bcrypt/argon2), không lưu plaintext.
 
-### NFR-08
-Các hành vi sửa/xóa dữ liệu nhạy cảm phải được hạn chế, hoặc áp dụng cơ chế soft delete/phiên bản hóa.
+### NFR-08. Soft delete và toàn vẹn dữ liệu
+- Các bảng chứa dữ liệu điều tra (`risk_case`, `corrective_task`, `scar_record`, `lesson_learned`, `attachment`) phải hỗ trợ soft delete bằng cột `archived_at`.
+- Dữ liệu đã soft delete không hiển thị trên UI mặc định nhưng vẫn truy vấn được cho mục đích kiểm toán.
+
+### NFR-08a. Upload Policy
+- Loại file cho phép: `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `video/quicktime`, `application/pdf`.
+- Kích thước tối đa: 50 MB cho ảnh, 500 MB cho video, 20 MB cho PDF.
+- Hệ thống nên tích hợp quét virus bất đồng bộ cho file mới upload.
+- Rate limit upload: tối đa 30 file/phút/user.
 
 ## 10.4 Tính sử dụng
 

@@ -1,12 +1,16 @@
 -- BIOSECURITY OS 2026
 -- PostgreSQL schema draft (Vietnamese annotations)
--- Phiên bản: 1.0
+-- Phiên bản: 1.1
 -- Ghi chú: schema này bám sát ERD v2 tiếng Việt, có một số tinh chỉnh thực thi:
 --   1) `user` -> `app_user`
 --   2) `role` -> `app_role`
 --   3) `permission` -> `app_permission`
 --   4) Bổ sung `role_permission` để mô hình role-permission ở dạng nhiều-nhiều
 --   5) Bổ sung `lookup_code` với cấu trúc đầy đủ để quản lý danh mục dùng chung
+--   6) Bổ sung `app_user_credential` và `app_refresh_token` cho xác thực
+--   7) Bổ sung cột `version` cho các bảng có state machine (optimistic locking)
+--   8) Bổ sung cột `archived_at` cho các bảng dữ liệu điều tra (soft delete)
+--   9) Bổ sung `created_at`/`updated_at` cho các bảng còn thiếu
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -70,6 +74,31 @@ CREATE TABLE biosec.app_user (
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_app_user_1 CHECK (status IN ('active','locked','archived'))
+);
+
+-- app_user_credential
+CREATE TABLE biosec.app_user_credential (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    user_id uuid NOT NULL,
+    password_hash varchar(255) NOT NULL,
+    failed_attempts integer DEFAULT 0 NOT NULL,
+    locked_until timestamptz,
+    password_changed_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
+    CONSTRAINT ck_app_user_credential_1 CHECK (failed_attempts >= 0)
+);
+
+-- app_refresh_token
+CREATE TABLE biosec.app_refresh_token (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    user_id uuid NOT NULL,
+    token_hash varchar(255) NOT NULL,
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz,
+    ip_address inet,
+    user_agent text,
+    created_at timestamptz DEFAULT now() NOT NULL
 );
 
 -- app_role
@@ -142,6 +171,7 @@ CREATE TABLE biosec.attachment (
     uploaded_at timestamptz DEFAULT now() NOT NULL,
     is_original_file boolean DEFAULT true NOT NULL,
     parent_attachment_id uuid,
+    archived_at timestamptz,
     CONSTRAINT ck_attachment_1 CHECK (file_size_bytes >= 0),
     CONSTRAINT ck_attachment_2 CHECK (latitude IS NULL OR (latitude >= -90 AND latitude <= 90)),
     CONSTRAINT ck_attachment_3 CHECK (longitude IS NULL OR (longitude >= -180 AND longitude <= 180))
@@ -172,6 +202,8 @@ CREATE TABLE biosec.farm_route (
     to_area_id uuid NOT NULL,
     direction_rule varchar(30) NOT NULL,
     note text,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_farm_route_1 CHECK (direction_rule IN ('one_way','restricted','conditional','bidirectional')),
     CONSTRAINT ck_farm_route_2 CHECK (from_area_id <> to_area_id)
 );
@@ -188,6 +220,8 @@ CREATE TABLE biosec.floorplan_version (
     status varchar(30) DEFAULT 'draft' NOT NULL,
     approved_by uuid,
     approved_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_floorplan_version_1 CHECK (version_no > 0),
     CONSTRAINT ck_floorplan_version_2 CHECK (status IN ('draft','active','archived')),
     CONSTRAINT ck_floorplan_version_3 CHECK (effective_to IS NULL OR effective_to >= effective_from)
@@ -203,6 +237,8 @@ CREATE TABLE biosec.floorplan_marker (
     x_percent numeric(5,2) NOT NULL,
     y_percent numeric(5,2) NOT NULL,
     metadata_json jsonb,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_floorplan_marker_1 CHECK (x_percent >= 0 AND x_percent <= 100),
     CONSTRAINT ck_floorplan_marker_2 CHECK (y_percent >= 0 AND y_percent <= 100)
 );
@@ -218,6 +254,8 @@ CREATE TABLE biosec.external_risk_point (
     distance_m integer,
     note text,
     confidence_level varchar(20) NOT NULL,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_external_risk_point_1 CHECK (latitude >= -90 AND latitude <= 90),
     CONSTRAINT ck_external_risk_point_2 CHECK (longitude >= -180 AND longitude <= 180),
     CONSTRAINT ck_external_risk_point_3 CHECK (distance_m IS NULL OR distance_m >= 0),
@@ -236,6 +274,8 @@ CREATE TABLE biosec.scorecard_template (
     status varchar(30) DEFAULT 'draft' NOT NULL,
     effective_from date NOT NULL,
     effective_to date,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_scorecard_template_1 CHECK (version_no > 0),
     CONSTRAINT ck_scorecard_template_2 CHECK (status IN ('draft','active','archived')),
     CONSTRAINT ck_scorecard_template_3 CHECK (effective_to IS NULL OR effective_to >= effective_from)
@@ -295,6 +335,7 @@ CREATE TABLE biosec.assessment (
     status varchar(30) DEFAULT 'draft' NOT NULL,
     summary_note text,
     trust_gap_basis_id uuid,
+    version integer DEFAULT 1 NOT NULL,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_assessment_1 CHECK (assessment_type IN ('self','scheduled_audit','spot','blind','incident_review')),
@@ -357,6 +398,9 @@ CREATE TABLE biosec.killer_metric_event (
     summary text NOT NULL,
     status varchar(30) DEFAULT 'open' NOT NULL,
     required_case_flag boolean DEFAULT true NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_killer_metric_event_1 CHECK (status IN ('open','under_review','contained','closed'))
 );
 
@@ -397,6 +441,10 @@ CREATE TABLE biosec.risk_case (
     closure_due_at timestamptz,
     opened_at timestamptz DEFAULT now() NOT NULL,
     closed_at timestamptz,
+    version integer DEFAULT 1 NOT NULL,
+    archived_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_risk_case_1 CHECK (priority IN ('P0','P1','P2','P3')),
     CONSTRAINT ck_risk_case_2 CHECK (severity IN ('low','medium','high','critical')),
     CONSTRAINT ck_risk_case_3 CHECK (current_status IN ('open','triage','in_analysis','actioning','monitoring','closed','cancelled')),
@@ -465,6 +513,10 @@ CREATE TABLE biosec.corrective_task (
     created_by_user_id uuid NOT NULL,
     closed_by_user_id uuid,
     closed_at timestamptz,
+    version integer DEFAULT 1 NOT NULL,
+    archived_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_corrective_task_1 CHECK (task_type IN ('corrective','preventive','inspection','training','capex')),
     CONSTRAINT ck_corrective_task_2 CHECK (priority IN ('P0','P1','P2','P3')),
     CONSTRAINT ck_corrective_task_3 CHECK (status IN ('open','accepted','in_progress','pending_review','needs_rework','closed','cancelled')),
@@ -534,6 +586,9 @@ CREATE TABLE biosec.scar_record (
     created_by_user_id uuid NOT NULL,
     validated_by_user_id uuid,
     validated_at timestamptz,
+    archived_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_scar_record_1 CHECK (scar_type IN ('outbreak','hotspot','repeated_breach','near_miss','structural_flaw')),
     CONSTRAINT ck_scar_record_2 CHECK (confidence_level IN ('suspected','probable','confirmed')),
     CONSTRAINT ck_scar_record_3 CHECK (x_percent IS NULL OR (x_percent >= 0 AND x_percent <= 100)),
@@ -567,6 +622,9 @@ CREATE TABLE biosec.lesson_learned (
     status varchar(30) DEFAULT 'draft' NOT NULL,
     confirmed_by_user_id uuid,
     confirmed_at timestamptz,
+    archived_at timestamptz,
+    created_at timestamptz DEFAULT now() NOT NULL,
+    updated_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT ck_lesson_learned_1 CHECK (confidence_level IN ('suspected','probable','confirmed')),
     CONSTRAINT ck_lesson_learned_2 CHECK (status IN ('draft','validated','archived','obsolete'))
 );
@@ -662,6 +720,19 @@ COMMENT ON COLUMN biosec.app_user.last_login_at IS $$ Lần đăng nhập gần 
 COMMENT ON COLUMN biosec.app_user.created_at IS $$ Thời điểm hệ thống tạo bản ghi. $$;
 COMMENT ON COLUMN biosec.app_user.updated_at IS $$ Thời điểm cập nhật gần nhất. $$;
 
+COMMENT ON TABLE biosec.app_user_credential IS $$ Bảng lưu trữ thông tin xác thực của người dùng. Tách riêng khỏi app_user để tăng bảo mật. $$;
+COMMENT ON COLUMN biosec.app_user_credential.user_id IS $$ Người dùng sở hữu credential này. $$;
+COMMENT ON COLUMN biosec.app_user_credential.password_hash IS $$ Mật khẩu đã hash (bcrypt/argon2). Không bao giờ lưu plaintext. $$;
+COMMENT ON COLUMN biosec.app_user_credential.failed_attempts IS $$ Số lần đăng nhập sai liên tiếp, reset về 0 khi thành công. $$;
+COMMENT ON COLUMN biosec.app_user_credential.locked_until IS $$ Thời điểm hết khóa tạm nếu tài khoản bị lock do sai password. $$;
+COMMENT ON COLUMN biosec.app_user_credential.password_changed_at IS $$ Lần đổi mật khẩu gần nhất. $$;
+
+COMMENT ON TABLE biosec.app_refresh_token IS $$ Bảng lưu trữ refresh token cho JWT session management. $$;
+COMMENT ON COLUMN biosec.app_refresh_token.user_id IS $$ Người dùng sở hữu token. $$;
+COMMENT ON COLUMN biosec.app_refresh_token.token_hash IS $$ Hash của refresh token, không lưu token gốc. $$;
+COMMENT ON COLUMN biosec.app_refresh_token.expires_at IS $$ Thời điểm token hết hạn. $$;
+COMMENT ON COLUMN biosec.app_refresh_token.revoked_at IS $$ Thời điểm token bị thu hồi (logout hoặc kick). $$;
+
 COMMENT ON TABLE biosec.app_role IS $$ Bảng vai trò nghiệp vụ/ứng dụng. Bảng này tương ứng với bảng `role` trong ERD. $$;
 COMMENT ON COLUMN biosec.app_role.id IS $$ Khóa chính (PK) của bảng. $$;
 COMMENT ON COLUMN biosec.app_role.code IS $$ Mã role kỹ thuật/nghiệp vụ, ví dụ EXEC, EXPERT, QA. $$;
@@ -718,6 +789,7 @@ COMMENT ON COLUMN biosec.attachment.uploaded_by_user_id IS $$ Người tải fil
 COMMENT ON COLUMN biosec.attachment.uploaded_at IS $$ Thời điểm upload thành công. $$;
 COMMENT ON COLUMN biosec.attachment.is_original_file IS $$ Phân biệt file gốc và file bản trình bày/annotate/chuyển đổi. $$;
 COMMENT ON COLUMN biosec.attachment.parent_attachment_id IS $$ Nếu file này sinh ra từ file gốc khác thì tham chiếu về file cha. $$;
+COMMENT ON COLUMN biosec.attachment.archived_at IS $$ Thời điểm soft delete; NULL nghĩa là chưa xóa. $$;
 
 COMMENT ON TABLE biosec.farm_area IS $$ Bảng cấu trúc khu vực bên trong trại. $$;
 COMMENT ON COLUMN biosec.farm_area.id IS $$ Khóa chính (PK) của bảng. $$;
@@ -1064,6 +1136,8 @@ ALTER TABLE biosec.farm ADD CONSTRAINT fk_farm_region_id FOREIGN KEY (region_id)
 ALTER TABLE biosec.app_user ADD CONSTRAINT fk_app_user_region_id FOREIGN KEY (region_id) REFERENCES biosec.region(id) ON DELETE SET NULL;
 ALTER TABLE biosec.app_user ADD CONSTRAINT fk_app_user_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE SET NULL;
 ALTER TABLE biosec.region ADD CONSTRAINT fk_region_manager_user_id FOREIGN KEY (manager_user_id) REFERENCES biosec.app_user(id) ON DELETE SET NULL;
+ALTER TABLE biosec.app_user_credential ADD CONSTRAINT fk_app_user_credential_user_id FOREIGN KEY (user_id) REFERENCES biosec.app_user(id) ON DELETE CASCADE;
+ALTER TABLE biosec.app_refresh_token ADD CONSTRAINT fk_app_refresh_token_user_id FOREIGN KEY (user_id) REFERENCES biosec.app_user(id) ON DELETE CASCADE;
 ALTER TABLE biosec.role_permission ADD CONSTRAINT fk_role_permission_role_id FOREIGN KEY (role_id) REFERENCES biosec.app_role(id) ON DELETE CASCADE;
 ALTER TABLE biosec.role_permission ADD CONSTRAINT fk_role_permission_permission_id FOREIGN KEY (permission_id) REFERENCES biosec.app_permission(id) ON DELETE CASCADE;
 ALTER TABLE biosec.user_role ADD CONSTRAINT fk_user_role_user_id FOREIGN KEY (user_id) REFERENCES biosec.app_user(id) ON DELETE CASCADE;
@@ -1141,6 +1215,7 @@ ALTER TABLE biosec.audit_log ADD CONSTRAINT fk_audit_log_actor_user_id FOREIGN K
 
 ALTER TABLE biosec.region ADD CONSTRAINT uq_region_code UNIQUE (code);
 ALTER TABLE biosec.app_user ADD CONSTRAINT uq_app_user_username UNIQUE (username);
+ALTER TABLE biosec.app_user_credential ADD CONSTRAINT uq_app_user_credential_user_id UNIQUE (user_id);
 ALTER TABLE biosec.app_role ADD CONSTRAINT uq_app_role_code UNIQUE (code);
 ALTER TABLE biosec.app_permission ADD CONSTRAINT uq_app_permission_code UNIQUE (code);
 ALTER TABLE biosec.role_permission ADD CONSTRAINT uq_role_permission_role_id_permission_id UNIQUE (role_id, permission_id);
@@ -1183,6 +1258,17 @@ CREATE TRIGGER trg_app_user_set_updated_at BEFORE UPDATE ON biosec.app_user FOR 
 CREATE TRIGGER trg_lookup_code_set_updated_at BEFORE UPDATE ON biosec.lookup_code FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
 CREATE TRIGGER trg_farm_area_set_updated_at BEFORE UPDATE ON biosec.farm_area FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
 CREATE TRIGGER trg_assessment_set_updated_at BEFORE UPDATE ON biosec.assessment FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_app_user_credential_set_updated_at BEFORE UPDATE ON biosec.app_user_credential FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_farm_route_set_updated_at BEFORE UPDATE ON biosec.farm_route FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_floorplan_version_set_updated_at BEFORE UPDATE ON biosec.floorplan_version FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_floorplan_marker_set_updated_at BEFORE UPDATE ON biosec.floorplan_marker FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_external_risk_point_set_updated_at BEFORE UPDATE ON biosec.external_risk_point FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_scorecard_template_set_updated_at BEFORE UPDATE ON biosec.scorecard_template FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_killer_metric_event_set_updated_at BEFORE UPDATE ON biosec.killer_metric_event FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_risk_case_set_updated_at BEFORE UPDATE ON biosec.risk_case FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_corrective_task_set_updated_at BEFORE UPDATE ON biosec.corrective_task FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_scar_record_set_updated_at BEFORE UPDATE ON biosec.scar_record FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
+CREATE TRIGGER trg_lesson_learned_set_updated_at BEFORE UPDATE ON biosec.lesson_learned FOR EACH ROW EXECUTE FUNCTION biosec.set_updated_at();
 
 CREATE OR REPLACE FUNCTION biosec.fn_enforce_task_close_requires_review()
 RETURNS trigger
@@ -1354,9 +1440,22 @@ CREATE INDEX gin_lesson_learned_search ON biosec.lesson_learned USING GIN (to_ts
 CREATE INDEX gin_audit_log_after_json ON biosec.audit_log USING GIN (after_json);
 CREATE INDEX gin_floorplan_marker_metadata ON biosec.floorplan_marker USING GIN (metadata_json);
 
+-- Composite indexes cho các query phổ biến nhất
+CREATE INDEX idx_risk_case_queue ON biosec.risk_case (farm_id, current_status, priority) WHERE archived_at IS NULL;
+CREATE INDEX idx_corrective_task_listing ON biosec.corrective_task (case_id, status, priority) WHERE archived_at IS NULL;
+CREATE INDEX idx_assessment_listing ON biosec.assessment (farm_id, assessment_type, status);
+CREATE INDEX idx_scar_record_farm_event ON biosec.scar_record (farm_id, area_id, event_date DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_trust_score_trend ON biosec.trust_score_snapshot (farm_id, snapshot_date DESC);
+CREATE INDEX idx_attachment_not_archived ON biosec.attachment (uploaded_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_app_refresh_token_user_id ON biosec.app_refresh_token (user_id);
+CREATE INDEX idx_app_refresh_token_expires ON biosec.app_refresh_token (expires_at) WHERE revoked_at IS NULL;
+
 -- Ghi chú triển khai:
 -- 1) `case_no`, `task_no`, `lesson_no` đang để application/service layer sinh theo quy ước doanh nghiệp.
 -- 2) Nếu sau này cần PostGIS hoặc TimescaleDB, nên thêm migration riêng để tránh khóa chặt môi trường MVP.
--- 3) Hệ thống khuyến nghị dùng soft delete ở tầng ứng dụng; migration này chưa thêm cột archived_at cho toàn bộ bảng.
+-- 3) Soft delete đã được triển khai bằng cột `archived_at` cho các bảng dữ liệu điều tra (risk_case, corrective_task, scar_record, lesson_learned, attachment).
+-- 4) Optimistic locking đã được triển khai bằng cột `version` cho các bảng có state machine (assessment, risk_case, corrective_task, killer_metric_event).
+-- 5) Xác thực được hỗ trợ qua bảng `app_user_credential` và `app_refresh_token`.
+-- 6) Application layer phải validate referential integrity cho polymorphic FK trong `scar_link` và `lesson_reference`.
 
 COMMIT;

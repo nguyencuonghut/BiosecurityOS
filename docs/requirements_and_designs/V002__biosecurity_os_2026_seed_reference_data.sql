@@ -147,7 +147,11 @@ VALUES
     ('notification_channel','in_app','Trong ứng dụng',1,true,NULL),
     ('notification_channel','email','Email',2,true,NULL),
     ('notification_channel','webhook','Webhook',3,true,NULL),
-    ('notification_channel','sms','SMS',4,true,NULL)
+    ('notification_channel','sms','SMS',4,true,NULL),
+    ('killer_event_status','open','Mới phát hiện',1,true,NULL),
+    ('killer_event_status','under_review','Đang xem xét',2,true,NULL),
+    ('killer_event_status','contained','Đã kiểm soát',3,true,NULL),
+    ('killer_event_status','closed','Đã đóng',4,true,NULL)
 ON CONFLICT (group_code, code) DO UPDATE
 SET name = EXCLUDED.name,
     display_order = EXCLUDED.display_order,

@@ -56,6 +56,8 @@ ERD này phục vụ 4 mục tiêu:
 
 ### 3.1 Nhóm tổ chức và người dùng
 - `user`
+- `user_credential`
+- `refresh_token`
 - `role`
 - `permission`
 - `user_role`
@@ -190,6 +192,32 @@ Bảng tài khoản người dùng sử dụng hệ thống.
 | last_login_at | timestamptz | Không | Lần đăng nhập gần nhất, phục vụ kiểm soát sử dụng tài khoản. |
 | created_at | timestamptz | Có | Thời điểm hệ thống tạo bản ghi. |
 | updated_at | timestamptz | Có | Thời điểm cập nhật gần nhất. |
+
+### `user_credential`
+Bảng lưu trữ thông tin xác thực của người dùng. Tách riêng khỏi bảng `user` để tăng bảo mật và linh hoạt.
+| Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |
+|---|---|---:|---|
+| id | uuid | Có | Khóa chính (PK) của bảng. |
+| user_id | uuid | Có | Người dùng sở hữu credential này. FK tới `user`. |
+| password_hash | varchar(255) | Có | Mật khẩu đã hash (bcrypt/argon2). Không bao giờ lưu plaintext. |
+| failed_attempts | integer | Có | Số lần đăng nhập sai liên tiếp. Reset về 0 khi đăng nhập thành công. |
+| locked_until | timestamptz | Không | Thời điểm hết khóa tạm nếu tài khoản bị lock do sai password nhiều lần. |
+| password_changed_at | timestamptz | Không | Lần đổi mật khẩu gần nhất. |
+| created_at | timestamptz | Có | Thời điểm hệ thống tạo bản ghi. |
+| updated_at | timestamptz | Có | Thời điểm cập nhật gần nhất. |
+
+### `refresh_token`
+Bảng lưu trữ refresh token để hỗ trợ JWT session management.
+| Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |
+|---|---|---:|---|
+| id | uuid | Có | Khóa chính (PK) của bảng. |
+| user_id | uuid | Có | Người dùng sở hữu token. FK tới `user`. |
+| token_hash | varchar(255) | Có | Hash của refresh token. Không lưu token gốc. |
+| expires_at | timestamptz | Có | Thời điểm token hết hạn. |
+| revoked_at | timestamptz | Không | Thời điểm token bị thu hồi (logout hoặc bị kick). |
+| ip_address | inet | Không | IP tại thời điểm cấp token. |
+| user_agent | text | Không | Thông tin thiết bị/trình duyệt. |
+| created_at | timestamptz | Có | Thời điểm cấp token. |
 
 ### `role`
 Bảng vai trò nghiệp vụ/ứng dụng.
@@ -730,6 +758,10 @@ Bảng tùy chọn để chuẩn hóa code set như `status`, `priority`, `confi
 5. `scar_record` gắn vào sơ đồ phải tham chiếu đúng `floorplan_version` tương ứng thời điểm sự kiện.
 6. `trust_score_snapshot` chỉ nên tính từ cặp self-audit và audit độc lập có thời gian nằm trong cửa sổ so sánh cấu hình.
 7. `attachment.parent_attachment_id` giúp giữ chain of custody giữa file gốc và file xử lý.
+8. `scar_link` và `lesson_reference` sử dụng polymorphic FK (`linked_object_type` + `linked_object_id`). Do DB không enforce FK cho dạng này, **application layer bắt buộc phải validate** rằng `linked_object_id` tồn tại trong bảng tương ứng.
+9. Các bảng có state machine (`risk_case`, `corrective_task`, `assessment`, `killer_metric_event`) nên có cột `version` (integer) phục vụ optimistic locking, tránh race condition khi nhiều người cùng thao tác.
+10. Các bảng chứa dữ liệu điều tra (`risk_case`, `corrective_task`, `scar_record`, `lesson_learned`, `attachment`) nên có cột `archived_at` (timestamptz, nullable) phục vụ soft delete.
+11. Các bảng dưới đây cần bổ sung `created_at` / `updated_at` cho đồng bộ nguyên tắc thiết kế mục 2: `farm_route`, `floorplan_version`, `floorplan_marker`, `external_risk_point`, `scorecard_template`, `risk_case`, `corrective_task`, `task_review`, `scar_record`, `lesson_learned`.
 
 ---
 
