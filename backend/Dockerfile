@@ -5,9 +5,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
+COPY app/ app/
 RUN pip install --no-cache-dir .
-
-COPY . .
 
 # ── Stage 2: Development (uvicorn --reload) ─────────────────
 FROM base AS development

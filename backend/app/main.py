@@ -5,8 +5,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.exceptions import RequestValidationError
+
 from app.config import settings
-from app.shared.exceptions import AppException, app_exception_handler
+from app.shared.exceptions import (
+    AppException,
+    app_exception_handler,
+    validation_exception_handler,
+)
 from app.shared.middleware import audit_log_middleware, request_id_middleware
 
 
@@ -43,6 +49,7 @@ app.middleware("http")(request_id_middleware)
 
 # ── Exception handlers ──
 app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
 # ── Health check ──
@@ -52,5 +59,6 @@ async def health_check():
 
 
 # ── API routers (will be added as modules are implemented) ──
-# from app.auth.router import router as auth_router
-# app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
+from app.auth.router import router as auth_router
+
+app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])

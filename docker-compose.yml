@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-biosec}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-biosec_dev_2026}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -68,6 +68,10 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./backend/tests:/app/tests
+      - ./backend/pyproject.toml:/app/pyproject.toml
     depends_on:
       postgres:
         condition: service_healthy

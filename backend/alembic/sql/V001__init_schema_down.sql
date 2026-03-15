@@ -1,0 +1,49 @@
+-- Downgrade: drop all tables, functions, triggers in biosec schema
+-- Order matters: drop tables with FK dependencies first (reverse of creation order)
+
+DROP TABLE IF EXISTS biosec.similarity_tag CASCADE;
+DROP TABLE IF EXISTS biosec.lesson_reference CASCADE;
+DROP TABLE IF EXISTS biosec.lesson_learned CASCADE;
+DROP TABLE IF EXISTS biosec.scar_link CASCADE;
+DROP TABLE IF EXISTS biosec.scar_record CASCADE;
+DROP TABLE IF EXISTS biosec.task_comment CASCADE;
+DROP TABLE IF EXISTS biosec.task_review CASCADE;
+DROP TABLE IF EXISTS biosec.task_attachment CASCADE;
+DROP TABLE IF EXISTS biosec.task_assignee CASCADE;
+DROP TABLE IF EXISTS biosec.corrective_task CASCADE;
+DROP TABLE IF EXISTS biosec.rca_factor CASCADE;
+DROP TABLE IF EXISTS biosec.rca_record CASCADE;
+DROP TABLE IF EXISTS biosec.case_participant CASCADE;
+DROP TABLE IF EXISTS biosec.risk_case CASCADE;
+DROP TABLE IF EXISTS biosec.trust_score_snapshot CASCADE;
+DROP TABLE IF EXISTS biosec.killer_metric_event CASCADE;
+DROP TABLE IF EXISTS biosec.killer_metric_definition CASCADE;
+DROP TABLE IF EXISTS biosec.assessment_attachment CASCADE;
+DROP TABLE IF EXISTS biosec.assessment_item_result CASCADE;
+DROP TABLE IF EXISTS biosec.assessment CASCADE;
+DROP TABLE IF EXISTS biosec.scorecard_item CASCADE;
+DROP TABLE IF EXISTS biosec.scorecard_section CASCADE;
+DROP TABLE IF EXISTS biosec.scorecard_template CASCADE;
+DROP TABLE IF EXISTS biosec.external_risk_point CASCADE;
+DROP TABLE IF EXISTS biosec.floorplan_marker CASCADE;
+DROP TABLE IF EXISTS biosec.floorplan_version CASCADE;
+DROP TABLE IF EXISTS biosec.farm_route CASCADE;
+DROP TABLE IF EXISTS biosec.farm_area CASCADE;
+DROP TABLE IF EXISTS biosec.attachment CASCADE;
+DROP TABLE IF EXISTS biosec.notification CASCADE;
+DROP TABLE IF EXISTS biosec.audit_log CASCADE;
+DROP TABLE IF EXISTS biosec.lookup_code CASCADE;
+DROP TABLE IF EXISTS biosec.user_role CASCADE;
+DROP TABLE IF EXISTS biosec.role_permission CASCADE;
+DROP TABLE IF EXISTS biosec.app_permission CASCADE;
+DROP TABLE IF EXISTS biosec.app_role CASCADE;
+DROP TABLE IF EXISTS biosec.app_refresh_token CASCADE;
+DROP TABLE IF EXISTS biosec.app_user_credential CASCADE;
+DROP TABLE IF EXISTS biosec.app_user CASCADE;
+DROP TABLE IF EXISTS biosec.farm CASCADE;
+DROP TABLE IF EXISTS biosec.region CASCADE;
+
+DROP FUNCTION IF EXISTS biosec.set_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS biosec.fn_enforce_task_close_requires_review() CASCADE;
+DROP FUNCTION IF EXISTS biosec.fn_enforce_killer_event_close_requires_case() CASCADE;
+DROP FUNCTION IF EXISTS biosec.fn_enforce_validated_lesson_requires_support() CASCADE;
