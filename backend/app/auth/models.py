@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,9 +34,19 @@ class Farm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("biosec.region.id", ondelete="RESTRICT"), nullable=False
     )
     address: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[float | None] = mapped_column(Numeric(10, 7), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(10, 7), nullable=True)
+    capacity_headcount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     operational_status: Mapped[str] = mapped_column(String(30), server_default="active", nullable=False)
+    baseline_risk_level: Mapped[str] = mapped_column(String(30), server_default="medium", nullable=False)
+    structural_risk_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(Date, nullable=True)
 
     region: Mapped["Region"] = relationship(back_populates="farms")
+    areas: Mapped[list["FarmArea"]] = relationship(back_populates="farm")
+    routes: Mapped[list["FarmRoute"]] = relationship(back_populates="farm")
+    external_risk_points: Mapped[list["ExternalRiskPoint"]] = relationship(back_populates="farm")
 
 
 class AppUser(UUIDPrimaryKeyMixin, TimestampMixin, Base):

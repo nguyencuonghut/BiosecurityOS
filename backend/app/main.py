@@ -60,5 +60,14 @@ async def health_check():
 
 # ── API routers (will be added as modules are implemented) ──
 from app.auth.router import router as auth_router
+from app.regions.router import router as regions_router
+from app.users.router import router as users_router
+from app.farms.router import router as farms_router
+
+# Ensure all ORM models are discovered by SQLAlchemy
+import app.farms.models as _farms_models  # noqa: F401
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
+app.include_router(regions_router, prefix=settings.API_V1_PREFIX + "/regions", tags=["regions"])
+app.include_router(users_router, prefix=settings.API_V1_PREFIX + "/users", tags=["users"])
+app.include_router(farms_router, prefix=settings.API_V1_PREFIX + "/farms", tags=["farms"])
