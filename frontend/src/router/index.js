@@ -8,10 +8,30 @@ const routes = [
     meta: { requiresAuth: false },
   },
   {
+    path: '/403',
+    name: 'Forbidden',
+    component: () => import('@/views/errors/ForbiddenView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/',
-    name: 'Dashboard',
-    component: () => import('@/views/dashboard/ExecutiveDashboard.vue'),
+    component: () => import('@/layouts/AppLayout.vue'),
     meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'Dashboard',
+        component: () => import('@/views/dashboard/ExecutiveDashboard.vue'),
+      },
+      // Sprint 02+ routes will be added here
+      // { path: 'farms', name: 'Farms', component: ..., meta: { permission: 'FARM_READ' } },
+    ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/errors/NotFoundView.vue'),
+    meta: { requiresAuth: false },
   },
 ]
 
@@ -20,15 +40,34 @@ const router = createRouter({
   routes,
 })
 
-// Route guard — will be enhanced with real auth check in auth module
-router.beforeEach((to) => {
-  const isAuthenticated = !!localStorage.getItem('access_token')
+// ── Route guard — uses auth store (lazy import to avoid circular deps) ──
+router.beforeEach(async (to) => {
+  // Lazy import to avoid circular dependency with store ↔ router
+  const { useAuthStore } = await import('@/stores/auth.js')
+  const authStore = useAuthStore()
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    return { name: 'Login' }
+  // If authenticated but profile not yet loaded (page refresh), fetch it
+  if (authStore.accessToken && !authStore.user) {
+    try {
+      await authStore.init()
+    } catch {
+      return { name: 'Login' }
+    }
   }
-  if (to.name === 'Login' && isAuthenticated) {
+
+  // Check authentication
+  if (to.meta.requiresAuth !== false && !authStore.isAuthenticated) {
+    return { name: 'Login', query: { redirect: to.fullPath } }
+  }
+
+  // Redirect logged-in users away from login page
+  if (to.name === 'Login' && authStore.isAuthenticated) {
     return { name: 'Dashboard' }
+  }
+
+  // Check route-level permission
+  if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
+    return { name: 'Forbidden' }
   }
 })
 

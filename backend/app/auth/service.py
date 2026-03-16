@@ -63,8 +63,12 @@ async def login(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> TokenResponse:
-    # Find user
-    stmt = select(AppUser).where(AppUser.username == username)
+    # Find user by username or email
+    from sqlalchemy import or_
+
+    stmt = select(AppUser).where(
+        or_(AppUser.username == username, AppUser.email == username)
+    )
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:

@@ -7,11 +7,25 @@ const apiClient = axios.create({
   },
 })
 
+// ── Token accessor — set by authStore on init ──
+let _getTokens = () => ({
+  accessToken: localStorage.getItem('access_token'),
+  refreshToken: localStorage.getItem('refresh_token'),
+})
+let _onTokenRefreshed = null // (accessToken, refreshToken) => void
+let _onAuthFailed = null // () => void
+
+export function setTokenCallbacks({ getTokens, onTokenRefreshed, onAuthFailed }) {
+  if (getTokens) _getTokens = getTokens
+  if (onTokenRefreshed) _onTokenRefreshed = onTokenRefreshed
+  if (onAuthFailed) _onAuthFailed = onAuthFailed
+}
+
 // ── Request interceptor: attach Bearer token ──
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const { accessToken } = _getTokens()
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
   }
   return config
 })
@@ -50,7 +64,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token')
+        const { refreshToken } = _getTokens()
         if (!refreshToken) {
           throw new Error('No refresh token')
         }
@@ -60,18 +74,20 @@ apiClient.interceptors.response.use(
           { refresh_token: refreshToken },
         )
 
-        localStorage.setItem('access_token', data.data.access_token)
-        localStorage.setItem('refresh_token', data.data.refresh_token)
+        // Backend returns flat: { access_token, refresh_token, token_type, expires_in }
+        if (_onTokenRefreshed) {
+          _onTokenRefreshed(data.access_token, data.refresh_token)
+        }
 
-        processQueue(null, data.data.access_token)
+        processQueue(null, data.access_token)
 
-        originalRequest.headers.Authorization = `Bearer ${data.data.access_token}`
+        originalRequest.headers.Authorization = `Bearer ${data.access_token}`
         return apiClient(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        window.location.href = '/login'
+        if (_onAuthFailed) {
+          _onAuthFailed()
+        }
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
