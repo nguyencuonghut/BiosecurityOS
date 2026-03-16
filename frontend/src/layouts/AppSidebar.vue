@@ -14,7 +14,8 @@ const menuItems = computed(() => {
   const all = [
     { label: 'Dashboard', icon: 'pi pi-chart-bar', to: '/', permission: null },
     { label: 'Trại', icon: 'pi pi-building', to: '/farms', permission: 'FARM_READ' },
-    { label: 'Đánh giá', icon: 'pi pi-clipboard', to: '/assessments', permission: 'ASSESSMENT_CREATE' },
+    { label: 'Scorecard', icon: 'pi pi-list', to: '/scorecards', permission: 'SCORECARD_READ' },
+    { label: 'Đánh giá', icon: 'pi pi-clipboard', to: '/assessments', permission: 'ASSESSMENT_READ' },
     { label: 'Cases', icon: 'pi pi-exclamation-triangle', to: '/cases', permission: 'CASE_CREATE' },
     { label: 'Tasks', icon: 'pi pi-check-square', to: '/tasks', permission: 'TASK_CREATE' },
     { label: 'Scar Map', icon: 'pi pi-map', to: '/scars', permission: 'SCAR_READ' },

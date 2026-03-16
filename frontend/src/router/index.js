@@ -41,6 +41,30 @@ const routes = [
         component: () => import('@/views/admin/UserManagementView.vue'),
         meta: { permission: 'USER_ADMIN' },
       },
+      {
+        path: 'scorecards',
+        name: 'Scorecards',
+        component: () => import('@/views/scorecards/ScorecardListView.vue'),
+        meta: { permission: 'SCORECARD_READ' },
+      },
+      {
+        path: 'scorecards/:id',
+        name: 'ScorecardBuilder',
+        component: () => import('@/views/scorecards/ScorecardBuilderView.vue'),
+        meta: { permission: 'SCORECARD_READ' },
+      },
+      {
+        path: 'assessments',
+        name: 'Assessments',
+        component: () => import('@/views/assessments/AssessmentListView.vue'),
+        meta: { permission: 'ASSESSMENT_READ' },
+      },
+      {
+        path: 'assessments/:id',
+        name: 'AssessmentForm',
+        component: () => import('@/views/assessments/AssessmentFormView.vue'),
+        meta: { permission: 'ASSESSMENT_READ' },
+      },
     ],
   },
   {
