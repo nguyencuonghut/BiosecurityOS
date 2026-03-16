@@ -63,11 +63,21 @@ from app.auth.router import router as auth_router
 from app.regions.router import router as regions_router
 from app.users.router import router as users_router
 from app.farms.router import router as farms_router
+from app.scorecards.router import router as scorecards_router
+from app.scorecards.router import section_router as scorecard_sections_router
+from app.scorecards.router import item_router as scorecard_items_router
+from app.assessments.router import router as assessments_router
 
 # Ensure all ORM models are discovered by SQLAlchemy
 import app.farms.models as _farms_models  # noqa: F401
+import app.scorecards.models as _scorecards_models  # noqa: F401
+import app.assessments.models as _assessments_models  # noqa: F401
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
 app.include_router(regions_router, prefix=settings.API_V1_PREFIX + "/regions", tags=["regions"])
 app.include_router(users_router, prefix=settings.API_V1_PREFIX + "/users", tags=["users"])
 app.include_router(farms_router, prefix=settings.API_V1_PREFIX + "/farms", tags=["farms"])
+app.include_router(scorecards_router, prefix=settings.API_V1_PREFIX + "/scorecard-templates", tags=["scorecards"])
+app.include_router(scorecard_sections_router, prefix=settings.API_V1_PREFIX + "/scorecard-sections", tags=["scorecards"])
+app.include_router(scorecard_items_router, prefix=settings.API_V1_PREFIX + "/scorecard-items", tags=["scorecards"])
+app.include_router(assessments_router, prefix=settings.API_V1_PREFIX + "/assessments", tags=["assessments"])
