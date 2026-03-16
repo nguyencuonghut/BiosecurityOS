@@ -1,4 +1,4 @@
-"""Seed script for development: creates an admin user + assigns SYSTEM_ADMIN role."""
+"""Seed script for development: creates sample users for every role."""
 
 import asyncio
 
@@ -9,43 +9,56 @@ from app.auth.models import AppRole, AppUser, AppUserCredential, UserRole
 from app.auth.security import hash_password
 from app.database import async_session_factory
 
+# (username, full_name, email, role_code)
+SEED_USERS = [
+    ("admin", "System Administrator", "admin@biosec.local", "SYSTEM_ADMIN"),
+    ("region_mgr", "Nguyễn Văn Vùng", "region_mgr@biosec.local", "REGION_MANAGER"),
+    ("farm_mgr", "Trần Thị Trại", "farm_mgr@biosec.local", "FARM_MANAGER"),
+    ("expert", "Lê Văn Chuyên", "expert@biosec.local", "BIOSEC_EXPERT"),
+    ("auditor", "Phạm Thị Kiểm", "auditor@biosec.local", "AUDITOR"),
+    ("viewer", "Hoàng Văn Xem", "viewer@biosec.local", "VIEWER"),
+]
 
-async def seed_admin() -> None:
+DEFAULT_PASSWORD = "Admin@2026"
+
+
+async def seed_users() -> None:
     async with async_session_factory() as db:
-        # Check if admin already exists
-        result = await db.execute(select(AppUser).where(AppUser.username == "admin"))
-        if result.scalar_one_or_none():
-            print("Admin user already exists, skipping.")
-            return
+        for username, full_name, email, role_code in SEED_USERS:
+            # Skip if user already exists
+            result = await db.execute(select(AppUser).where(AppUser.username == username))
+            if result.scalar_one_or_none():
+                print(f"User '{username}' already exists, skipping.")
+                continue
 
-        user = AppUser(
-            username="admin",
-            full_name="System Administrator",
-            email="admin@biosec.local",
-            status="active",
-        )
-        db.add(user)
-        await db.flush()
+            user = AppUser(
+                username=username,
+                full_name=full_name,
+                email=email,
+                status="active",
+            )
+            db.add(user)
+            await db.flush()
 
-        cred = AppUserCredential(
-            user_id=user.id,
-            password_hash=hash_password("Admin@2026"),
-        )
-        db.add(cred)
+            cred = AppUserCredential(
+                user_id=user.id,
+                password_hash=hash_password(DEFAULT_PASSWORD),
+            )
+            db.add(cred)
 
-        # Find SYSTEM_ADMIN role
-        role_result = await db.execute(select(AppRole).where(AppRole.code == "SYSTEM_ADMIN"))
-        admin_role = role_result.scalar_one_or_none()
-        if admin_role:
-            ur = UserRole(user_id=user.id, role_id=admin_role.id)
-            db.add(ur)
+            # Assign role
+            role_result = await db.execute(select(AppRole).where(AppRole.code == role_code))
+            role = role_result.scalar_one_or_none()
+            if role:
+                db.add(UserRole(user_id=user.id, role_id=role.id))
+
+            print(f"Created user: {username} / {role_code} (id={user.id})")
 
         await db.commit()
-        print(f"Created admin user: {user.username} (id={user.id})")
 
 
 async def main():
-    await seed_admin()
+    await seed_users()
 
 
 if __name__ == "__main__":
