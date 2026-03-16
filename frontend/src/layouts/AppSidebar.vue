@@ -16,11 +16,13 @@ const menuItems = computed(() => {
     { label: 'Trại', icon: 'pi pi-building', to: '/farms', permission: 'FARM_READ' },
     { label: 'Scorecard', icon: 'pi pi-list', to: '/scorecards', permission: 'SCORECARD_READ' },
     { label: 'Đánh giá', icon: 'pi pi-clipboard', to: '/assessments', permission: 'ASSESSMENT_READ' },
+    { label: 'Killer Metrics', icon: 'pi pi-bolt', to: '/killer-metrics/events', permission: 'KILLER_EVENT_READ' },
     { label: 'Cases', icon: 'pi pi-exclamation-triangle', to: '/cases', permission: 'CASE_CREATE' },
     { label: 'Tasks', icon: 'pi pi-check-square', to: '/tasks', permission: 'TASK_CREATE' },
     { label: 'Scar Map', icon: 'pi pi-map', to: '/scars', permission: 'SCAR_READ' },
     { label: 'Bài học', icon: 'pi pi-book', to: '/lessons', permission: 'SCAR_READ' },
     { label: 'Admin', icon: 'pi pi-cog', to: '/admin/users', permission: 'USER_ADMIN' },
+    { label: 'KM Definitions', icon: 'pi pi-exclamation-circle', to: '/killer-metrics/definitions', permission: 'KILLER_EVENT_WRITE' },
   ]
   return all.filter((item) => !item.permission || authStore.hasPermission(item.permission))
 })

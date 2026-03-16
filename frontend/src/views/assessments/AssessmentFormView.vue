@@ -3,6 +3,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAssessmentStore } from '@/stores/assessment.js'
 import * as scorecardService from '@/services/scorecardService.js'
+import * as assessmentService from '@/services/assessmentService.js'
+import * as trustScoreService from '@/services/trustScoreService.js'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
@@ -26,6 +28,8 @@ const activeSectionIndex = ref(0)
 const itemResults = ref({}) // scorecard_item_id → result data
 const saving = ref(false)
 const showSpider = ref(false)
+const comparisonSpider = ref(null)
+const trustScoreResult = ref(null)
 
 const assessment = computed(() => store.currentAssessment)
 const isDraft = computed(() => assessment.value?.status === 'draft')
@@ -44,6 +48,7 @@ onMounted(async () => {
     if (isSubmitted.value) {
       await store.fetchSpiderChart(assessmentId.value)
       showSpider.value = true
+      await loadComparison()
     }
   }
 })
@@ -121,6 +126,7 @@ async function handleSubmit() {
     await store.submitAssessment(assessmentId.value)
     await store.fetchSpiderChart(assessmentId.value)
     showSpider.value = true
+    await loadComparison()
     toast.add({ severity: 'success', summary: 'Đã nộp đánh giá', detail: `Điểm tổng: ${assessment.value.overall_score}`, life: 5000 })
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Lỗi nộp', detail: e.response?.data?.error?.message || 'Lỗi nộp đánh giá', life: 5000 })
@@ -133,6 +139,21 @@ function sectionProgress(section) {
   if (!section.items?.length) return 0
   const filled = section.items.filter((it) => itemResults.value[it.id]).length
   return Math.round((filled / section.items.length) * 100)
+}
+
+async function loadComparison() {
+  const a = assessment.value
+  if (!a) return
+  // Load comparison spider data if trust_gap_basis_id exists
+  if (a.trust_gap_basis_id) {
+    try {
+      comparisonSpider.value = await assessmentService.getSpiderChart(a.trust_gap_basis_id)
+    } catch { comparisonSpider.value = null }
+  }
+  // Fetch trust score for this farm
+  try {
+    trustScoreResult.value = await trustScoreService.getLatestTrustScore(a.farm_id)
+  } catch { trustScoreResult.value = null }
 }
 
 function sectionTypeLabel(t) {
@@ -234,7 +255,24 @@ function goPrevSection() {
         <i class="pi pi-chart-pie" />
         <h3>Biểu đồ đánh giá</h3>
       </div>
-      <SpiderChart :data="store.spiderData" :overallScore="assessment.overall_score != null ? Number(assessment.overall_score) : null" />
+      <SpiderChart
+        :data="store.spiderData"
+        :comparison="comparisonSpider"
+        :overallScore="assessment.overall_score != null ? Number(assessment.overall_score) : null"
+      />
+      <!-- Trust Score display -->
+      <div v-if="trustScoreResult" class="trust-score-bar">
+        <div class="ts-info">
+          <span class="ts-label">Trust Score</span>
+          <span class="ts-value" :class="trustScoreResult.trust_score >= 80 ? 'ts-good' : trustScoreResult.trust_score >= 60 ? 'ts-warn' : 'ts-bad'">
+            {{ Math.round(trustScoreResult.trust_score) }}
+          </span>
+          <span v-if="trustScoreResult.trend" class="ts-trend">
+            <i :class="trustScoreResult.trend === 'up' ? 'pi pi-arrow-up' : trustScoreResult.trend === 'down' ? 'pi pi-arrow-down' : 'pi pi-minus'" />
+          </span>
+        </div>
+        <div class="ts-note" v-if="trustScoreResult.note">{{ trustScoreResult.note }}</div>
+      </div>
     </div>
 
     <!-- Main content: section nav + items -->
@@ -686,4 +724,36 @@ function goPrevSection() {
 }
 
 .loading-container { display: flex; justify-content: center; padding: 4rem; }
+
+/* ── Trust Score Bar ── */
+.trust-score-bar {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--p-surface-card);
+  border: 1px solid var(--p-surface-border);
+  border-radius: 8px;
+}
+
+.ts-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ts-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.ts-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.ts-good { color: var(--p-green-500); }
+.ts-warn { color: var(--p-orange-500); }
+.ts-bad { color: var(--p-red-500); }
+
+.ts-trend { font-size: 0.85rem; }
+.ts-note { font-size: 0.8rem; color: var(--p-text-muted-color); margin-top: 0.25rem; }
 </style>

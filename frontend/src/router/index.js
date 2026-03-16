@@ -65,6 +65,18 @@ const routes = [
         component: () => import('@/views/assessments/AssessmentFormView.vue'),
         meta: { permission: 'ASSESSMENT_READ' },
       },
+      {
+        path: 'killer-metrics/definitions',
+        name: 'KillerMetricDefinitions',
+        component: () => import('@/views/killer-metrics/KillerMetricDefinitionAdmin.vue'),
+        meta: { permission: 'KILLER_EVENT_WRITE' },
+      },
+      {
+        path: 'killer-metrics/events',
+        name: 'KillerMetricEvents',
+        component: () => import('@/views/killer-metrics/KillerMetricEventList.vue'),
+        meta: { permission: 'KILLER_EVENT_READ' },
+      },
     ],
   },
   {

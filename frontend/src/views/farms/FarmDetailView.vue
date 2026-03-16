@@ -17,12 +17,14 @@ import FarmRoutePanel from '@/views/farms/FarmRoutePanel.vue'
 import FarmRiskPointPanel from '@/views/farms/FarmRiskPointPanel.vue'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
+import { useTrustScoreStore } from '@/stores/trustScore.js'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const farmStore = useFarmStore()
 const authStore = useAuthStore()
+const trustScoreStore = useTrustScoreStore()
 
 const activeTab = ref('0')
 const showEditDialog = ref(false)
@@ -36,6 +38,7 @@ onMounted(async () => {
     farmStore.fetchAreas(route.params.id),
     farmStore.fetchRoutes(route.params.id),
     farmStore.fetchRiskPoints(route.params.id),
+    trustScoreStore.fetchLatest(route.params.id),
   ])
 })
 
@@ -52,6 +55,20 @@ function farmTypeLabel(val) {
 function ownershipLabel(val) {
   const m = { company: 'Công ty', lease: 'Thuê', contract: 'Hợp đồng', other: 'Khác' }
   return m[val] || val
+}
+
+function trustScoreColor(score) {
+  if (score == null) return 'muted'
+  if (score >= 80) return 'green'
+  if (score >= 60) return 'yellow'
+  return 'red'
+}
+
+function trustScoreSeverity(score) {
+  if (score == null) return 'secondary'
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'warn'
+  return 'danger'
 }
 
 function openEdit() {
@@ -117,6 +134,18 @@ async function onSaved() {
       <div class="info-card">
         <div class="info-label">Ngày mở</div>
         <div class="info-value">{{ farm.opened_at || '—' }}</div>
+      </div>
+      <div class="info-card trust-score-card" :class="'ts-' + trustScoreColor(trustScoreStore.latestScore?.trust_score)">
+        <div class="info-label">Trust Score</div>
+        <div class="trust-score-value" v-if="trustScoreStore.latestScore">
+          <span class="ts-number">{{ Math.round(trustScoreStore.latestScore.trust_score) }}</span>
+          <Tag :value="trustScoreStore.latestScore.trust_score >= 80 ? 'Tốt' : trustScoreStore.latestScore.trust_score >= 60 ? 'Trung bình' : 'Thấp'" :severity="trustScoreSeverity(trustScoreStore.latestScore.trust_score)" />
+          <div class="ts-trend" v-if="trustScoreStore.latestScore.trend">
+            <i :class="trustScoreStore.latestScore.trend === 'up' ? 'pi pi-arrow-up' : trustScoreStore.latestScore.trend === 'down' ? 'pi pi-arrow-down' : 'pi pi-minus'" :style="{ color: trustScoreStore.latestScore.trend === 'up' ? 'var(--p-green-500)' : trustScoreStore.latestScore.trend === 'down' ? 'var(--p-red-500)' : 'var(--p-text-muted-color)' }"></i>
+            <span v-if="trustScoreStore.latestScore.change">{{ trustScoreStore.latestScore.change > 0 ? '+' : '' }}{{ trustScoreStore.latestScore.change.toFixed(1) }}</span>
+          </div>
+        </div>
+        <div class="info-value" v-else>Chưa có</div>
       </div>
     </div>
 
@@ -261,5 +290,35 @@ async function onSaved() {
   text-align: center;
   padding: 4rem 0;
   color: var(--p-text-muted-color);
+}
+
+/* Trust Score card */
+.trust-score-card {
+  position: relative;
+}
+
+.trust-score-card.ts-green { border-left: 3px solid var(--p-green-500); }
+.trust-score-card.ts-yellow { border-left: 3px solid var(--p-yellow-500); }
+.trust-score-card.ts-red { border-left: 3px solid var(--p-red-500); }
+
+.trust-score-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ts-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ts-trend {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 </style>
