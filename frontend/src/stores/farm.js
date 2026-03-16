@@ -8,7 +8,7 @@ export const useFarmStore = defineStore('farm', () => {
   const farms = ref([])
   const totalRecords = ref(0)
   const loading = ref(false)
-  const filters = ref({ page: 1, page_size: 20, region_id: null, farm_type: null, ownership_type: null })
+  const filters = ref({ page: 1, page_size: 20, region_id: null, farm_type: null, ownership_type: null, search: null })
 
   // ── Detail state ──
   const currentFarm = ref(null)
@@ -28,6 +28,7 @@ export const useFarmStore = defineStore('farm', () => {
       if (filters.value.farm_type) params.farm_type = filters.value.farm_type
       if (filters.value.ownership_type) params.ownership_type = filters.value.ownership_type
       if (filters.value.sort) params.sort = filters.value.sort
+      if (filters.value.search) params.search = filters.value.search
 
       const result = await farmService.listFarms(params)
       farms.value = result.data

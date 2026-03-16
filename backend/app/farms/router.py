@@ -41,6 +41,7 @@ async def list_farms(
     ownership_type: Annotated[str | None, Query()] = None,
     operational_status: Annotated[str | None, Query()] = None,
     baseline_risk_level: Annotated[str | None, Query()] = None,
+    search: Annotated[str | None, Query()] = None,
 ):
     items, total = await service.list_farms(
         db,
@@ -50,6 +51,7 @@ async def list_farms(
         ownership_type=ownership_type,
         operational_status=operational_status,
         baseline_risk_level=baseline_risk_level,
+        search=search,
         page=pagination.page,
         page_size=pagination.page_size,
     )

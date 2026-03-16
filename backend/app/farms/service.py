@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import AppUser, Farm
@@ -40,6 +40,7 @@ async def list_farms(
     ownership_type: str | None = None,
     operational_status: str | None = None,
     baseline_risk_level: str | None = None,
+    search: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[Farm], int]:
@@ -65,6 +66,11 @@ async def list_farms(
     if baseline_risk_level:
         query = query.where(Farm.baseline_risk_level == baseline_risk_level)
         count_query = count_query.where(Farm.baseline_risk_level == baseline_risk_level)
+    if search:
+        pattern = f"%{search}%"
+        search_filter = or_(Farm.code.ilike(pattern), Farm.name.ilike(pattern))
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
 

@@ -20,6 +20,15 @@ const authStore = useAuthStore()
     </div>
 
     <div class="topbar-right">
+      <Button
+        icon="pi pi-bell"
+        text
+        rounded
+        severity="secondary"
+        aria-label="Thông báo"
+        v-tooltip.bottom="'Thông báo (Sprint 10)'"
+        disabled
+      />
       <span class="user-greeting">
         <i class="pi pi-user"></i>
         {{ authStore.fullName }}

@@ -6,6 +6,9 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -40,6 +43,8 @@ const ownershipOptions = [
 const regionFilter = ref(null)
 const farmTypeFilter = ref(null)
 const ownershipFilter = ref(null)
+const searchText = ref('')
+let searchTimer = null
 
 onMounted(async () => {
   await farmStore.fetchRegions()
@@ -76,6 +81,15 @@ function applyFilters() {
 }
 
 watch([regionFilter, farmTypeFilter, ownershipFilter], applyFilters)
+
+watch(searchText, (val) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    farmStore.filters.search = val || null
+    farmStore.filters.page = 1
+    farmStore.fetchFarms()
+  }, 400)
+})
 
 function openCreate() {
   editFarm.value = null
@@ -144,6 +158,10 @@ function regionName(regionId) {
     >
       <template #header>
         <div class="filter-bar">
+          <IconField>
+            <InputIcon class="pi pi-search" />
+            <InputText v-model="searchText" placeholder="Tìm kiếm trại..." />
+          </IconField>
           <Select
             v-model="regionFilter"
             :options="regionOptions"

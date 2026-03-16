@@ -120,6 +120,15 @@ async function onSaved() {
       </div>
     </div>
 
+    <!-- Structural Risk Note -->
+    <div class="risk-note-section" v-if="farm.structural_risk_note">
+      <div class="risk-note-label">
+        <i class="pi pi-exclamation-triangle" style="color: var(--p-orange-500)"></i>
+        Ghi chú rủi ro cấu trúc
+      </div>
+      <div class="risk-note-text">{{ farm.structural_risk_note }}</div>
+    </div>
+
     <!-- Tabs -->
     <Tabs v-model:value="activeTab">
       <TabList>
@@ -216,6 +225,30 @@ async function onSaved() {
 .info-value {
   font-weight: 600;
   font-size: 0.9rem;
+}
+
+.risk-note-section {
+  background: var(--p-surface-card);
+  border: 1px solid var(--p-orange-200);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.risk-note-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+  margin-bottom: 0.35rem;
+}
+
+.risk-note-text {
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.5;
 }
 
 .placeholder {
