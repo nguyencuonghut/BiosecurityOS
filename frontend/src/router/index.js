@@ -23,8 +23,24 @@ const routes = [
         name: 'Dashboard',
         component: () => import('@/views/dashboard/ExecutiveDashboard.vue'),
       },
-      // Sprint 02+ routes will be added here
-      // { path: 'farms', name: 'Farms', component: ..., meta: { permission: 'FARM_READ' } },
+      {
+        path: 'farms',
+        name: 'Farms',
+        component: () => import('@/views/farms/FarmListView.vue'),
+        meta: { permission: 'FARM_READ' },
+      },
+      {
+        path: 'farms/:id',
+        name: 'FarmDetail',
+        component: () => import('@/views/farms/FarmDetailView.vue'),
+        meta: { permission: 'FARM_READ' },
+      },
+      {
+        path: 'admin/users',
+        name: 'UserManagement',
+        component: () => import('@/views/admin/UserManagementView.vue'),
+        meta: { permission: 'USER_ADMIN' },
+      },
     ],
   },
   {

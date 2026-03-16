@@ -19,14 +19,14 @@ const menuItems = computed(() => {
     { label: 'Tasks', icon: 'pi pi-check-square', to: '/tasks', permission: 'TASK_CREATE' },
     { label: 'Scar Map', icon: 'pi pi-map', to: '/scars', permission: 'SCAR_READ' },
     { label: 'Bài học', icon: 'pi pi-book', to: '/lessons', permission: 'SCAR_READ' },
-    { label: 'Admin', icon: 'pi pi-cog', to: '/admin', permission: 'USER_ADMIN' },
+    { label: 'Admin', icon: 'pi pi-cog', to: '/admin/users', permission: 'USER_ADMIN' },
   ]
   return all.filter((item) => !item.permission || authStore.hasPermission(item.permission))
 })
 
 function isActive(to) {
   if (to === '/') return route.path === '/'
-  return route.path.startsWith(to)
+  return route.path === to || route.path.startsWith(to + '/')
 }
 </script>
 

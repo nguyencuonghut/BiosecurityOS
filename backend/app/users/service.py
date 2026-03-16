@@ -12,6 +12,12 @@ from app.shared.exceptions import ConflictException, NotFoundException, Validati
 from app.users.schemas import UserCreate, UserRoleAssign, UserUpdate
 
 
+async def list_roles(db: AsyncSession) -> list[AppRole]:
+    """Return all available roles (for role assignment UI)."""
+    result = await db.execute(select(AppRole).order_by(AppRole.code))
+    return list(result.scalars().all())
+
+
 async def list_users(
     db: AsyncSession,
     *,

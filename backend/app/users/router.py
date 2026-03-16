@@ -36,6 +36,18 @@ def _user_to_dict(user) -> dict:
     return out
 
 
+@router.get("/roles")
+async def list_roles(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    """Return all available roles for the role assignment UI."""
+    roles = await service.list_roles(db)
+    data = [{"id": str(r.id), "code": r.code, "name": r.name, "scope_type": r.scope_type} for r in roles]
+    return success_response(request, data)
+
+
 @router.get("")
 async def list_users(
     request: Request,
