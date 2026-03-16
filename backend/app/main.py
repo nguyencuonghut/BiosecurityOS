@@ -67,11 +67,17 @@ from app.scorecards.router import router as scorecards_router
 from app.scorecards.router import section_router as scorecard_sections_router
 from app.scorecards.router import item_router as scorecard_items_router
 from app.assessments.router import router as assessments_router
+from app.killer_metrics.router import definition_router as killer_def_router
+from app.killer_metrics.router import event_router as killer_event_router
+from app.trust_scores.router import router as trust_scores_router
 
 # Ensure all ORM models are discovered by SQLAlchemy
 import app.farms.models as _farms_models  # noqa: F401
 import app.scorecards.models as _scorecards_models  # noqa: F401
 import app.assessments.models as _assessments_models  # noqa: F401
+import app.killer_metrics.models as _killer_metrics_models  # noqa: F401
+import app.killer_metrics.notification_model as _notification_model  # noqa: F401
+import app.trust_scores.models as _trust_scores_models  # noqa: F401
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
 app.include_router(regions_router, prefix=settings.API_V1_PREFIX + "/regions", tags=["regions"])
@@ -81,3 +87,6 @@ app.include_router(scorecards_router, prefix=settings.API_V1_PREFIX + "/scorecar
 app.include_router(scorecard_sections_router, prefix=settings.API_V1_PREFIX + "/scorecard-sections", tags=["scorecards"])
 app.include_router(scorecard_items_router, prefix=settings.API_V1_PREFIX + "/scorecard-items", tags=["scorecards"])
 app.include_router(assessments_router, prefix=settings.API_V1_PREFIX + "/assessments", tags=["assessments"])
+app.include_router(killer_def_router, prefix=settings.API_V1_PREFIX + "/killer-metric-definitions", tags=["killer-metrics"])
+app.include_router(killer_event_router, prefix=settings.API_V1_PREFIX + "/killer-metric-events", tags=["killer-metrics"])
+app.include_router(trust_scores_router, prefix=settings.API_V1_PREFIX + "/trust-scores", tags=["trust-scores"])
