@@ -266,6 +266,14 @@ backend/
 > - **Pinia** cho state management (không Vuex)
 > - **Vue Router 4** với `<script setup>` guards
 > - File `.vue` dùng `<script setup>`, file logic thuần dùng `.js`
+>
+> **⚠️ TÁCH LOGIC KHỎI .VUE:**
+> - File `.vue` (`<script setup>`) chỉ chứa: import store/composable, bind template, xử lý UI event ngắn gọn.
+> - **`services/*.js`** — business logic: gọi API, transform/validate data, xử lý error mapping. Mỗi module 1 file (vd: `authService.js`, `farmService.js`).
+> - **`stores/*.js`** — Pinia store: giữ state + actions gọi service. Không gọi `apiClient` trực tiếp trong store.
+> - **`api/client.js`** — chỉ chứa axios instance + interceptor. Không chứa logic nghiệp vụ.
+> - **`composables/*.js`** — shared reactive logic dùng lại giữa nhiều view (vd: `usePagination`, `useOptimisticLock`).
+> - Flow: **View → Store → Service → API client**
 
 ```
 frontend/
@@ -283,17 +291,19 @@ frontend/
 │   │   ├── task.js
 │   │   └── notification.js
 │   │
-│   ├── api/                     # Axios instances + per-module API calls
-│   │   ├── client.js            #   Base axios config, interceptors, token refresh
-│   │   ├── auth.js
-│   │   ├── farms.js
-│   │   ├── assessments.js
-│   │   ├── cases.js
-│   │   ├── tasks.js
-│   │   ├── attachments.js
-│   │   ├── scars.js
-│   │   ├── lessons.js
-│   │   └── dashboards.js
+│   ├── api/                     # Axios instance — transport layer only
+│   │   └── client.js            #   Base axios config, interceptors, token refresh
+│   │
+│   ├── services/                # Business logic — gọi API + transform data
+│   │   ├── authService.js
+│   │   ├── farmService.js
+│   │   ├── assessmentService.js
+│   │   ├── caseService.js
+│   │   ├── taskService.js
+│   │   ├── attachmentService.js
+│   │   ├── scarService.js
+│   │   ├── lessonService.js
+│   │   └── dashboardService.js
 │   │
 │   ├── views/                   # Page-level components
 │   │   ├── auth/
