@@ -77,6 +77,18 @@ const routes = [
         component: () => import('@/views/killer-metrics/KillerMetricEventList.vue'),
         meta: { permission: 'KILLER_EVENT_READ' },
       },
+      {
+        path: 'cases',
+        name: 'CaseQueue',
+        component: () => import('@/views/cases/CaseQueueView.vue'),
+        meta: { permission: 'CASE_CREATE' },
+      },
+      {
+        path: 'cases/:id',
+        name: 'CaseDetail',
+        component: () => import('@/views/cases/CaseDetailView.vue'),
+        meta: { permission: 'CASE_CREATE' },
+      },
     ],
   },
   {
