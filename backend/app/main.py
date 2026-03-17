@@ -71,6 +71,8 @@ from app.killer_metrics.router import definition_router as killer_def_router
 from app.killer_metrics.router import event_router as killer_event_router
 from app.trust_scores.router import router as trust_scores_router
 from app.cases.router import case_router, rca_router, rca_factor_router
+from app.tasks.router import task_router
+from app.attachments.router import attachment_router
 
 # Ensure all ORM models are discovered by SQLAlchemy
 import app.farms.models as _farms_models  # noqa: F401
@@ -80,6 +82,8 @@ import app.killer_metrics.models as _killer_metrics_models  # noqa: F401
 import app.killer_metrics.notification_model as _notification_model  # noqa: F401
 import app.trust_scores.models as _trust_scores_models  # noqa: F401
 import app.cases.models as _cases_models  # noqa: F401
+import app.tasks.models as _tasks_models  # noqa: F401
+import app.attachments.models as _attachments_models  # noqa: F401
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
 app.include_router(regions_router, prefix=settings.API_V1_PREFIX + "/regions", tags=["regions"])
@@ -95,3 +99,5 @@ app.include_router(trust_scores_router, prefix=settings.API_V1_PREFIX + "/trust-
 app.include_router(case_router, prefix=settings.API_V1_PREFIX + "/cases", tags=["cases"])
 app.include_router(rca_router, prefix=settings.API_V1_PREFIX + "/rca-records", tags=["rca"])
 app.include_router(rca_factor_router, prefix=settings.API_V1_PREFIX + "/rca-factors", tags=["rca"])
+app.include_router(task_router, prefix=settings.API_V1_PREFIX + "/tasks", tags=["tasks"])
+app.include_router(attachment_router, prefix=settings.API_V1_PREFIX + "/attachments", tags=["attachments"])
