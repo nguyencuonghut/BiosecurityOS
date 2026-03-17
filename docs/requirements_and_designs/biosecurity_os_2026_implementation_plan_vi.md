@@ -1110,14 +1110,14 @@ services:
 # ── Database
 POSTGRES_DB=biosecurity
 POSTGRES_USER=biosec
-POSTGRES_PASSWORD="Hongha@#2022"
+POSTGRES_PASSWORD=your_password
 
 # ── Redis
-REDIS_PASSWORD="Hongha@#2022"
+REDIS_PASSWORD=your_password
 
 # ── MinIO
 MINIO_ROOT_USER=minio_admin
-MINIO_ROOT_PASSWORD="Hongha@#2022"
+MINIO_ROOT_PASSWORD=your_password
 MINIO_BUCKET=biosec-evidence
 
 # ── JWT
@@ -1127,7 +1127,7 @@ JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # ── n8n
 N8N_USER=admin
-N8N_PASSWORD="Hongha@#2022"
+N8N_PASSWORD=your_password
 
 # ── App
 ENVIRONMENT=development    # development | staging | production
