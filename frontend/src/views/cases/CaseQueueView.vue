@@ -364,7 +364,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.case-queue-page { max-width: 1400px; }
+.case-queue-page { width: 100%; }
 
 .page-header {
   display: flex; justify-content: space-between; align-items: flex-start;

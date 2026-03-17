@@ -1,44 +1,98 @@
 <script setup>
-import AppTopbar from '@/layouts/AppTopbar.vue'
+import { useLayout } from '@/layouts/composables/layout'
+import AppFooter from '@/layouts/AppFooter.vue'
 import AppSidebar from '@/layouts/AppSidebar.vue'
-import { ref } from 'vue'
+import AppTopbar from '@/layouts/AppTopbar.vue'
+import Toast from 'primevue/toast'
 
-const sidebarVisible = ref(true)
-
-function toggleSidebar() {
-  sidebarVisible.value = !sidebarVisible.value
-}
+const { layoutState, containerClass, hideMobileMenu } = useLayout()
 </script>
 
 <template>
-  <div class="app-layout" :class="{ 'sidebar-collapsed': !sidebarVisible }">
-    <AppSidebar :visible="sidebarVisible" />
-    <div class="app-main">
-      <AppTopbar @toggle-sidebar="toggleSidebar" />
-      <main class="app-content">
+  <div class="layout-wrapper" :class="containerClass">
+    <AppTopbar />
+    <AppSidebar />
+    <div class="layout-main-container">
+      <div class="layout-main">
         <router-view />
-      </main>
+      </div>
+      <AppFooter />
     </div>
+    <div class="layout-mask animate-fadein" @click="hideMobileMenu" />
+    <Toast />
   </div>
 </template>
 
 <style scoped>
-.app-layout {
+.layout-wrapper {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--p-surface-ground);
 }
 
-.app-main {
+.layout-main-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  margin-left: 280px;
+  padding-top: 70px;
+  position: relative;
+  z-index: 1;
+  transition: margin-left 0.3s ease;
 }
 
-.app-content {
+.layout-main {
   flex: 1;
-  padding: 1.5rem;
-  background: var(--p-surface-ground);
   overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--p-surface-ground);
+}
+
+.layout-mask {
+  position: fixed;
+  height: 100%;
+  width: 100%;
+  top: 0;
+  left: 0;
+  background-color: var(--p-surface-overlay);
+  z-index: 998;
+  display: none;
+}
+
+.layout-static-inactive .layout-main-container {
+  margin-left: 60px;
+}
+
+.layout-mobile-active .layout-mask {
+  display: block;
+}
+
+/* Mobile responsive */
+@media screen and (max-width: 991px) {
+  .layout-main-container {
+    margin-left: 0;
+  }
+
+  .layout-mobile-active .layout-main-container {
+    margin-left: 280px;
+  }
+}
+
+/* Animations */
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadein {
+  animation: fadein 0.15s linear;
 }
 </style>

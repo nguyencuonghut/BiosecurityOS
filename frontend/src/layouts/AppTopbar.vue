@@ -1,22 +1,24 @@
 <script setup>
-import Button from 'primevue/button'
+import { useLayout } from '@/layouts/composables/layout'
 import { useAuthStore } from '@/stores/auth.js'
+import Button from 'primevue/button'
 
-const emit = defineEmits(['toggle-sidebar'])
+const { toggleSidebar } = useLayout()
 const authStore = useAuthStore()
 </script>
 
 <template>
-  <header class="app-topbar">
+  <header class="layout-topbar">
     <div class="topbar-left">
       <Button
         icon="pi pi-bars"
         text
         rounded
-        severity="secondary"
-        @click="emit('toggle-sidebar')"
+        class="layout-menu-button"
+        @click="toggleSidebar"
         aria-label="Toggle sidebar"
       />
+      <span class="app-title">Biosecurity OS</span>
     </div>
 
     <div class="topbar-right">
@@ -25,26 +27,83 @@ const authStore = useAuthStore()
         text
         rounded
         severity="secondary"
-        aria-label="Thông báo"
-        v-tooltip.bottom="'Thông báo (Sprint 10)'"
-        disabled
+        aria-label="Notifications"
       />
       <span class="user-greeting">
         <i class="pi pi-user"></i>
-        {{ authStore.fullName }}
+        {{ authStore.fullName || authStore.username }}
       </span>
       <Button
         icon="pi pi-sign-out"
         text
         rounded
         severity="secondary"
+        aria-label="Logout"
         @click="authStore.logout()"
-        aria-label="Đăng xuất"
-        v-tooltip.bottom="'Đăng xuất'"
       />
     </div>
   </header>
 </template>
+
+<style scoped>
+.layout-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: var(--p-surface-card);
+  border-bottom: 1px solid var(--p-surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  z-index: 1000;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--p-primary-color);
+  display: none;
+}
+
+.user-greeting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--p-text-color);
+  white-space: nowrap;
+}
+
+.user-greeting i {
+  font-size: 1rem;
+}
+
+@media screen and (max-width: 991px) {
+  .app-title {
+    display: inline;
+  }
+
+  .user-greeting {
+    display: none;
+  }
+}
+</style>
 
 <style scoped>
 .app-topbar {

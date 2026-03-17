@@ -296,7 +296,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.km-event-page { max-width: 1200px; }
+.km-event-page { width: 100%; }
 
 .page-header {
   display: flex;
