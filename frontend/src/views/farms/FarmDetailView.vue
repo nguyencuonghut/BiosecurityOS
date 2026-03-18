@@ -17,6 +17,7 @@ import FarmRoutePanel from '@/views/farms/FarmRoutePanel.vue'
 import FarmRiskPointPanel from '@/views/farms/FarmRiskPointPanel.vue'
 import FarmFloorplanPanel from '@/views/farms/FarmFloorplanPanel.vue'
 import FarmLessonPanel from '@/views/farms/FarmLessonPanel.vue'
+import FarmDashboardPanel from '@/components/dashboard/FarmDashboardPanel.vue'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useTrustScoreStore } from '@/stores/trustScore.js'
@@ -28,7 +29,7 @@ const farmStore = useFarmStore()
 const authStore = useAuthStore()
 const trustScoreStore = useTrustScoreStore()
 
-const activeTab = ref('0')
+const activeTab = ref('overview')
 const showEditDialog = ref(false)
 
 const farm = computed(() => farmStore.currentFarm)
@@ -163,6 +164,7 @@ async function onSaved() {
     <!-- Tabs -->
     <Tabs v-model:value="activeTab">
       <TabList>
+        <Tab value="overview">Tổng quan</Tab>
         <Tab value="0">Khu vực ({{ farmStore.areas.length }})</Tab>
         <Tab value="1">Lộ trình ({{ farmStore.routes.length }})</Tab>
         <Tab value="2">Điểm rủi ro ({{ farmStore.riskPoints.length }})</Tab>
@@ -170,6 +172,9 @@ async function onSaved() {
         <Tab value="4">Bài học</Tab>
       </TabList>
       <TabPanels>
+        <TabPanel value="overview">
+          <FarmDashboardPanel :farmId="farm.id" />
+        </TabPanel>
         <TabPanel value="0">
           <FarmAreaPanel :farmId="farm.id" />
         </TabPanel>

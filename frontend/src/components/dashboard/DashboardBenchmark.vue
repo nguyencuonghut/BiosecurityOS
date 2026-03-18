@@ -1,85 +1,26 @@
 <script setup>
-import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import ProgressBar from 'primevue/progressbar'
 
-// Mock farm benchmarking data
-const benchmarkData = ref([
-  {
-    id: 1,
-    rank: 1,
-    name: 'Trại nái Bắc Ninh',
-    code: 'F003',
-    score: 85.2,
-    trend: 2.3,
-    status: 'strong',
-    category: 'nái'
-  },
-  {
-    id: 2,
-    rank: 2,
-    name: 'Trại nái Hải Dương',
-    code: 'F001',
-    score: 82.4,
-    trend: 1.5,
-    status: 'good',
-    category: 'nái'
-  },
-  {
-    id: 3,
-    rank: 3,
-    name: 'Trại thịt Nam Đình',
-    code: 'F005',
-    score: 76.8,
-    trend: -0.5,
-    status: 'fair',
-    category: 'thịt'
-  },
-  {
-    id: 4,
-    rank: 4,
-    name: 'Trại nái Hà Nam',
-    code: 'F006',
-    score: 74.5,
-    trend: -2.1,
-    status: 'warning',
-    category: 'nái'
-  },
-  {
-    id: 5,
-    rank: 5,
-    name: 'Trại thịt Thanh Hóa',
-    code: 'F002',
-    score: 68.3,
-    trend: -3.2,
-    status: 'critical',
-    category: 'thịt'
-  }
-])
+const props = defineProps({
+  data: { type: Array, default: () => [] },
+})
 
-const getSeverityByStatus = (status) => {
-  const map = {
-    'strong': 'success',
-    'good': 'info',
-    'fair': 'warning',
-    'warning': 'warning',
-    'critical': 'danger'
-  }
-  return map[status] || 'info'
+const router = useRouter()
+
+function scoreSeverity(score) {
+  if (score == null) return 'secondary'
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'warn'
+  return 'danger'
 }
 
-const getStatusLabel = (status) => {
-  const map = {
-    'strong': 'Tốt lắm',
-    'good': 'Tốt',
-    'fair': 'Trung bình',
-    'warning': 'Cảnh báo',
-    'critical': 'Nguy hiểm'
-  }
-  return map[status] || status
+function navigateToFarm(farmId) {
+  router.push({ name: 'FarmDetail', params: { id: farmId } })
 }
 </script>
 
@@ -92,39 +33,41 @@ const getStatusLabel = (status) => {
 
     <template #content>
       <DataTable
-        :value="benchmarkData"
+        :value="data"
         class="benchmark-table"
         responsive-layout="scroll"
         table-style="min-width: 100%"
         :rows="10"
         striped-rows
+        @row-click="(e) => navigateToFarm(e.data.farm_id)"
+        row-hover
       >
         <!-- Rank Column -->
-        <Column field="rank" header="Xếp hạng" style="width: 8%" class="text-center">
+        <Column field="rank" header="Hạng" style="width: 8%" class="text-center">
           <template #body="slotProps">
-            <div class="rank-badge" :class="`rank-${slotProps.data.rank}`">
+            <div class="rank-badge" :class="`rank-${slotProps.data.rank <= 3 ? slotProps.data.rank : 'default'}`">
               {{ slotProps.data.rank }}
             </div>
           </template>
         </Column>
 
         <!-- Farm Column -->
-        <Column field="name" header="Trại" style="width: 30%">
+        <Column field="farm_name" header="Trại" style="width: 30%">
           <template #body="slotProps">
             <div class="farm-column">
-              <strong>{{ slotProps.data.name }}</strong>
-              <p class="farm-code">{{ slotProps.data.code }}</p>
+              <strong>{{ slotProps.data.farm_name }}</strong>
+              <p class="farm-code">{{ slotProps.data.farm_code }} · {{ slotProps.data.farm_type }} · {{ slotProps.data.region_name }}</p>
             </div>
           </template>
         </Column>
 
         <!-- Score Column -->
-        <Column field="score" header="Điểm" style="width: 25%">
+        <Column field="overall_score" header="Điểm ATSH" style="width: 25%" sortable>
           <template #body="slotProps">
             <div class="score-column">
-              <div class="score-value">{{ slotProps.data.score }}/100</div>
+              <div class="score-value">{{ slotProps.data.overall_score != null ? slotProps.data.overall_score.toFixed(1) : '—' }}/100</div>
               <ProgressBar
-                :value="slotProps.data.score"
+                :value="slotProps.data.overall_score ?? 0"
                 class="score-bar"
                 :show-value="false"
               />
@@ -132,26 +75,22 @@ const getStatusLabel = (status) => {
           </template>
         </Column>
 
-        <!-- Trend Column -->
-        <Column field="trend" header="Xu hướng" style="width: 15%">
+        <!-- Percentile Column -->
+        <Column field="percentile" header="Phân vị" style="width: 15%" sortable>
           <template #body="slotProps">
-            <div class="trend-column">
-              <i
-                :class="`pi ${slotProps.data.trend > 0 ? 'pi-arrow-up text-green-500' : 'pi-arrow-down text-red-500'}`"
-              ></i>
-              <span :class="slotProps.data.trend > 0 ? 'text-green-500' : 'text-red-500'">
-                {{ slotProps.data.trend > 0 ? '+' : '' }}{{ slotProps.data.trend }}%
-              </span>
-            </div>
+            <Tag
+              :value="`Top ${slotProps.data.percentile != null ? slotProps.data.percentile.toFixed(0) : '—'}%`"
+              :severity="scoreSeverity(slotProps.data.percentile != null ? (100 - slotProps.data.percentile) : null)"
+            />
           </template>
         </Column>
 
         <!-- Status Column -->
-        <Column field="status" header="Trạng thái" style="width: 20%">
+        <Column field="overall_score" header="Trạng thái" style="width: 20%">
           <template #body="slotProps">
             <Tag
-              :value="getStatusLabel(slotProps.data.status)"
-              :severity="getSeverityByStatus(slotProps.data.status)"
+              :value="slotProps.data.overall_score >= 80 ? 'Tốt' : slotProps.data.overall_score >= 60 ? 'Trung bình' : 'Cần cải thiện'"
+              :severity="scoreSeverity(slotProps.data.overall_score)"
             />
           </template>
         </Column>
@@ -202,7 +141,8 @@ const getStatusLabel = (status) => {
 }
 
 .rank-4,
-.rank-5 {
+.rank-5,
+.rank-default {
   background: var(--p-surface-border);
   color: var(--p-text-color);
 }
