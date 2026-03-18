@@ -24,6 +24,8 @@ import app.trust_scores.models  # noqa: F401
 import app.cases.models  # noqa: F401
 import app.tasks.models  # noqa: F401
 import app.attachments.models  # noqa: F401
+import app.floorplans.models  # noqa: F401
+import app.scars.models  # noqa: F401
 
 from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint
 from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
@@ -32,6 +34,8 @@ from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
 from app.trust_scores.models import TrustScoreSnapshot
 from app.cases.models import RiskCase, CaseParticipant, RcaRecord, RcaFactor
 from app.tasks.models import CorrectiveTask, TaskAssignee, TaskReview, TaskComment
+from app.floorplans.models import FloorplanVersion, FloorplanMarker
+from app.scars.models import ScarRecord, ScarLink
 
 # ═══════════════════════════════════════════════════════════════
 # Constants
@@ -543,35 +547,169 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════
+# 9. Floorplans
+# ═══════════════════════════════════════════════════════════════
+
+FLOORPLAN_DATA = [
+    ("FARM-N01", "Mặt bằng Hà Nam 1 — Khai trương 2024", date(2024, 1, 15)),
+    ("FARM-N02", "Mặt bằng Bắc Ninh 1 — Khai trương 2024", date(2024, 1, 15)),
+    ("FARM-N03", "Mặt bằng Thái Bình 1 — Khai trương 2024", date(2024, 1, 15)),
+    ("FARM-C01", "Mặt bằng Thanh Hóa 1 — Khai trương 2024", date(2024, 1, 15)),
+    ("FARM-S01", "Mặt bằng Đồng Nai 1 — Khai trương 2024", date(2024, 1, 15)),
+    ("FARM-S03", "Mặt bằng Long An 1 — Khai trương 2024", date(2024, 1, 15)),
+]
+
+MARKER_TEMPLATES = [
+    ("gate", "Cổng chính", 5.0, 50.0),
+    ("disinfection", "Trạm sát trùng", 15.0, 50.0),
+    ("feed_storage", "Kho cám", 30.0, 20.0),
+    ("quarantine", "Khu cách ly", 80.0, 15.0),
+    ("dead_pig_zone", "Khu xử lý heo chết", 90.0, 80.0),
+    ("checkpoint", "Trạm kiểm soát nội bộ", 50.0, 50.0),
+]
+
+
+async def _seed_floorplans(db: AsyncSession, farms: dict, areas: dict, users: dict) -> dict:
+    floorplans = {}
+    for farm_code, title, eff_from in FLOORPLAN_DATA:
+        farm = farms.get(farm_code)
+        if not farm:
+            continue
+        fp = FloorplanVersion(
+            farm_id=farm.id, version_no=1, title=title,
+            effective_from=eff_from, status="active",
+            approved_by=users["region_mgr"].id, approved_at=NOW - timedelta(days=60),
+        )
+        db.add(fp)
+        floorplans[farm_code] = fp
+    await db.flush()
+
+    for farm_code, fp in floorplans.items():
+        for m_type, m_label, x, y in MARKER_TEMPLATES:
+            area = areas.get((farm_code, "CLEAN")) if m_type in ("quarantine",) else None
+            db.add(FloorplanMarker(
+                floorplan_version_id=fp.id,
+                area_id=area.id if area else None,
+                marker_type=m_type, label=m_label,
+                x_percent=x, y_percent=y,
+            ))
+    await db.flush()
+    print(f"  Created {len(floorplans)} floorplans with {len(floorplans) * len(MARKER_TEMPLATES)} markers")
+    return floorplans
+
+
+# ═══════════════════════════════════════════════════════════════
+# 10. Scar Records
+# ═══════════════════════════════════════════════════════════════
+
+SCAR_DATA = [
+    # (farm_code, area_suffix, scar_type, title, description, confidence, event_date_offset_days, x, y)
+    ("FARM-N03", "CLEAN", "outbreak", "Ổ dịch khu sạch Q1/2025",
+     "Phát hiện ổ dịch PED tại khu sạch, nguồn lây nghi từ thức ăn nhiễm", "confirmed", 90, 45.0, 30.0),
+    ("FARM-N03", "DIRTY", "repeated_breach", "Vi phạm lặp lại cổng vào",
+     "Xe tải vào trại liên tục không qua sát trùng đúng quy trình, 4 lần trong 2 tháng", "confirmed", 60, 5.0, 50.0),
+    ("FARM-S03", "DIRTY", "hotspot", "Hotspot thu nhận heo ngoài",
+     "Khu vực nhận heo từ bên ngoài có tỷ lệ dương tính cao với PRRS", "probable", 45, 10.0, 70.0),
+    ("FARM-S03", "BUFFER", "near_miss", "Suýt lây nhiễm khu đệm",
+     "Phát hiện kịp thời nhân viên mang thức ăn ngoài vào khu đệm", "suspected", 30, 40.0, 55.0),
+    ("FARM-C01", "BUFFER", "structural_flaw", "Lỗ hổng hàng rào khu đệm",
+     "Hàng rào khu đệm bị hư hỏng, tạo lối đi tắt vào khu sạch", "confirmed", 20, 55.0, 35.0),
+    ("FARM-N01", "DIRTY", "repeated_breach", "Khách không đăng ký lặp lại",
+     "Người lạ xâm nhập khu vực trại 3 lần trong 1 tháng", "probable", 15, 8.0, 48.0),
+]
+
+
+async def _seed_scars(db: AsyncSession, farms: dict, areas: dict, floorplans: dict, cases: dict, users: dict) -> None:
+    count = 0
+    scars = []
+    for farm_code, area_suffix, s_type, title, desc, confidence, days_ago, x, y in SCAR_DATA:
+        farm = farms.get(farm_code)
+        area = areas.get((farm_code, area_suffix))
+        fp = floorplans.get(farm_code)
+        if not farm:
+            continue
+
+        # Recurrence detection
+        existing = [s for s in scars if s.farm_id == farm.id
+                    and (area and s.area_id == area.id) and s.scar_type == s_type]
+        rec_count = len(existing)
+
+        scar = ScarRecord(
+            farm_id=farm.id,
+            floorplan_version_id=fp.id if fp else None,
+            area_id=area.id if area else None,
+            scar_type=s_type, title=title, description=desc,
+            source_of_risk="Phân tích từ RCA và killer events",
+            confidence_level=confidence,
+            event_date=date.today() - timedelta(days=days_ago),
+            x_percent=x, y_percent=y,
+            recurrence_flag=rec_count > 0,
+            recurrence_count=rec_count,
+            created_by_user_id=users["expert"].id,
+            validated_by_user_id=users["expert"].id if confidence == "confirmed" else None,
+            validated_at=NOW - timedelta(days=days_ago - 2) if confidence == "confirmed" else None,
+        )
+        db.add(scar)
+        scars.append(scar)
+        count += 1
+    await db.flush()
+
+    # Link scars to cases
+    case_scar_map = {
+        "RC-2026-001": 0,  # FARM-N03 outbreak → scar[0]
+        "RC-2026-002": 2,  # FARM-S03 red line → scar[2]
+        "RC-2026-003": 4,  # FARM-C01 heo chết → scar[4]
+        "RC-2026-004": 5,  # FARM-N01 người lạ → scar[5]
+    }
+    for case_no, scar_idx in case_scar_map.items():
+        case = cases.get(case_no)
+        if case and scar_idx < len(scars):
+            db.add(ScarLink(
+                scar_id=scars[scar_idx].id,
+                linked_object_type="case",
+                linked_object_id=case.id,
+                link_reason="Case xử lý sự cố liên quan",
+            ))
+    await db.flush()
+    print(f"  Created {count} scar records with links")
+
+
+# ═══════════════════════════════════════════════════════════════
 # Main orchestrator
 # ═══════════════════════════════════════════════════════════════
 
 async def seed_all() -> None:
     """Run all seed functions in order."""
     async with async_session_factory() as db:
-        print("\n[1/8] Seeding users...")
+        print("\n[1/10] Seeding users...")
         users = await seed_users(db)
 
-        print("\n[2/8] Seeding regions & farms...")
+        print("\n[2/10] Seeding regions & farms...")
         _regions, farms, areas = await _seed_regions_and_farms(db, users)
 
-        print("\n[3/8] Seeding scorecard templates...")
+        print("\n[3/10] Seeding scorecard templates...")
         templates = await _seed_scorecards(db)
 
-        print("\n[4/8] Seeding assessments...")
+        print("\n[4/10] Seeding assessments...")
         assessments = await _seed_assessments(db, farms, templates, users)
 
-        print("\n[5/8] Seeding trust scores...")
+        print("\n[5/10] Seeding trust scores...")
         await _seed_trust_scores(db, farms, assessments)
 
-        print("\n[6/8] Seeding killer metric events...")
+        print("\n[6/10] Seeding killer metric events...")
         await _seed_killer_events(db, farms, areas, users)
 
-        print("\n[7/8] Seeding risk cases & RCA...")
+        print("\n[7/10] Seeding risk cases & RCA...")
         cases = await _seed_cases(db, farms, users)
 
-        print("\n[8/8] Seeding corrective tasks...")
+        print("\n[8/10] Seeding corrective tasks...")
         await _seed_tasks(db, cases, users)
+
+        print("\n[9/10] Seeding floorplans & markers...")
+        floorplans = await _seed_floorplans(db, farms, areas, users)
+
+        print("\n[10/10] Seeding scar records & links...")
+        await _seed_scars(db, farms, areas, floorplans, cases, users)
 
         await db.commit()
         print("\n✓ All sample data seeded successfully!")

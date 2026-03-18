@@ -73,6 +73,8 @@ from app.trust_scores.router import router as trust_scores_router
 from app.cases.router import case_router, rca_router, rca_factor_router
 from app.tasks.router import task_router
 from app.attachments.router import attachment_router
+from app.floorplans.router import farm_floorplan_router, floorplan_router
+from app.scars.router import scar_router, scar_map_router
 
 # Ensure all ORM models are discovered by SQLAlchemy
 import app.farms.models as _farms_models  # noqa: F401
@@ -84,6 +86,8 @@ import app.trust_scores.models as _trust_scores_models  # noqa: F401
 import app.cases.models as _cases_models  # noqa: F401
 import app.tasks.models as _tasks_models  # noqa: F401
 import app.attachments.models as _attachments_models  # noqa: F401
+import app.floorplans.models as _floorplans_models  # noqa: F401
+import app.scars.models as _scars_models  # noqa: F401
 
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX + "/auth", tags=["auth"])
 app.include_router(regions_router, prefix=settings.API_V1_PREFIX + "/regions", tags=["regions"])
@@ -101,3 +105,7 @@ app.include_router(rca_router, prefix=settings.API_V1_PREFIX + "/rca-records", t
 app.include_router(rca_factor_router, prefix=settings.API_V1_PREFIX + "/rca-factors", tags=["rca"])
 app.include_router(task_router, prefix=settings.API_V1_PREFIX + "/tasks", tags=["tasks"])
 app.include_router(attachment_router, prefix=settings.API_V1_PREFIX + "/attachments", tags=["attachments"])
+app.include_router(farm_floorplan_router, prefix=settings.API_V1_PREFIX + "/farms", tags=["floorplans"])
+app.include_router(floorplan_router, prefix=settings.API_V1_PREFIX + "/floorplans", tags=["floorplans"])
+app.include_router(scar_router, prefix=settings.API_V1_PREFIX + "/scars", tags=["scars"])
+app.include_router(scar_map_router, prefix=settings.API_V1_PREFIX + "/farms", tags=["scars"])
