@@ -107,6 +107,12 @@ const routes = [
         component: () => import('@/views/scars/ScarMapView.vue'),
         meta: { permission: 'SCAR_READ' },
       },
+      {
+        path: 'lessons',
+        name: 'LessonLibrary',
+        component: () => import('@/views/lessons/LessonLibraryView.vue'),
+        meta: { permission: 'LESSON_READ' },
+      },
     ],
   },
   {

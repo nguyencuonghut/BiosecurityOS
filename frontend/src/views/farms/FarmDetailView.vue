@@ -16,6 +16,7 @@ import FarmAreaPanel from '@/views/farms/FarmAreaPanel.vue'
 import FarmRoutePanel from '@/views/farms/FarmRoutePanel.vue'
 import FarmRiskPointPanel from '@/views/farms/FarmRiskPointPanel.vue'
 import FarmFloorplanPanel from '@/views/farms/FarmFloorplanPanel.vue'
+import FarmLessonPanel from '@/views/farms/FarmLessonPanel.vue'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useTrustScoreStore } from '@/stores/trustScore.js'
@@ -166,6 +167,7 @@ async function onSaved() {
         <Tab value="1">Lộ trình ({{ farmStore.routes.length }})</Tab>
         <Tab value="2">Điểm rủi ro ({{ farmStore.riskPoints.length }})</Tab>
         <Tab value="3">Floorplan</Tab>
+        <Tab value="4">Bài học</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="0">
@@ -179,6 +181,9 @@ async function onSaved() {
         </TabPanel>
         <TabPanel value="3">
           <FarmFloorplanPanel :farmId="farm.id" />
+        </TabPanel>
+        <TabPanel value="4">
+          <FarmLessonPanel :farmId="farm.id" :farmType="farm.farm_type" :ownershipType="farm.ownership_type" />
         </TabPanel>
       </TabPanels>
     </Tabs>

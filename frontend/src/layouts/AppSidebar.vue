@@ -20,7 +20,7 @@ const menuItems = computed(() => {
     { label: 'Cases', icon: 'pi pi-exclamation-triangle', to: '/cases', permission: 'CASE_CREATE' },
     { label: 'Tasks', icon: 'pi pi-check-square', to: '/tasks', permission: 'TASK_READ' },
     { label: 'Scar Map', icon: 'pi pi-map', to: '/scars', permission: 'SCAR_READ' },
-    { label: 'Bài học', icon: 'pi pi-book', to: '/lessons', permission: 'SCAR_READ' },
+    { label: 'Bài học', icon: 'pi pi-book', to: '/lessons', permission: 'LESSON_READ' },
     { label: 'Admin', icon: 'pi pi-cog', to: '/admin/users', permission: 'USER_ADMIN' },
     { label: 'KM Definitions', icon: 'pi pi-exclamation-circle', to: '/killer-metrics/definitions', permission: 'KILLER_EVENT_WRITE' },
   ]
