@@ -67,6 +67,36 @@ const { layoutState, containerClass, hideMobileMenu } = useLayout()
   margin-left: 60px;
 }
 
+.layout-static-inactive :deep(.layout-sidebar) {
+  width: 60px;
+}
+
+.layout-static-inactive :deep(.sidebar-nav) {
+  padding: 0.75rem 0.5rem;
+  align-items: center;
+}
+
+.layout-static-inactive :deep(.nav-item) {
+  justify-content: center;
+  padding: 0.75rem;
+  width: 40px;
+  height: 40px;
+  gap: 0;
+}
+
+.layout-static-inactive :deep(.sidebar-brand) {
+  justify-content: center;
+  padding: 1.5rem 0.5rem;
+}
+
+.layout-static-inactive :deep(.brand-text),
+.layout-static-inactive :deep(.nav-label) {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .layout-mobile-active .layout-mask {
   display: block;
 }
