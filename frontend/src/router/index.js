@@ -101,6 +101,12 @@ const routes = [
         component: () => import('@/views/tasks/TaskDetailView.vue'),
         meta: { permission: 'TASK_READ' },
       },
+      {
+        path: 'scars',
+        name: 'ScarMap',
+        component: () => import('@/views/scars/ScarMapView.vue'),
+        meta: { permission: 'SCAR_READ' },
+      },
     ],
   },
   {

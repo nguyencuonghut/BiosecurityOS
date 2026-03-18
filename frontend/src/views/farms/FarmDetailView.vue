@@ -15,6 +15,7 @@ import FarmFormDialog from '@/views/farms/FarmFormDialog.vue'
 import FarmAreaPanel from '@/views/farms/FarmAreaPanel.vue'
 import FarmRoutePanel from '@/views/farms/FarmRoutePanel.vue'
 import FarmRiskPointPanel from '@/views/farms/FarmRiskPointPanel.vue'
+import FarmFloorplanPanel from '@/views/farms/FarmFloorplanPanel.vue'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useTrustScoreStore } from '@/stores/trustScore.js'
@@ -177,7 +178,7 @@ async function onSaved() {
           <FarmRiskPointPanel :farmId="farm.id" />
         </TabPanel>
         <TabPanel value="3">
-          <div class="placeholder">Floorplan sẽ triển khai trong Sprint 07</div>
+          <FarmFloorplanPanel :farmId="farm.id" />
         </TabPanel>
       </TabPanels>
     </Tabs>

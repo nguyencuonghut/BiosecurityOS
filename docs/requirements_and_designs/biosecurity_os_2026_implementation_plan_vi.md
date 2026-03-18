@@ -694,8 +694,10 @@ Phase A ──→ Phase B ──→ Phase C ──→ Phase D
 | F07.1 | Floorplan upload & management | Tab trong Farm Profile | Upload image, manage versions, activate/archive |
 | F07.2 | Floorplan canvas component | `FloorplanCanvas.vue` | Load image, zoom/pan, marker overlay, click to add |
 | F07.3 | Scar map page | `ScarMapView.vue` | Floorplan + colored markers per scar type/confidence, filter panel, click → detail drawer |
-| F07.4 | Scar detail drawer | Side drawer | Scar info, linked cases/tasks, confidence badge, validate button |
+| F07.4 | Scar detail drawer | `ScarDetailDrawer.vue` | Scar info, linked cases/tasks, confidence badge, validate button, edit button |
 | F07.5 | Marker overlay | `MarkerOverlay.vue` | Icon per type, pulsing animation for active scars, tooltip on hover |
+| F07.6 | Scar create/edit dialog | `ScarFormDialog.vue` | Form: farm, scar_type, title, description, source_of_risk, confidence_level, event_date, vị trí (x/y %), area; nút Tạo trong ScarMapView, nút Sửa trong ScarDetailDrawer |
+| F07.7 | Scar link management | Dialog trong ScarDetailDrawer | Thêm liên kết: chọn loại (case/task/assessment/attachment), tìm kiếm đối tượng, nhập lý do; hiển thị danh sách liên kết hiện có |
 
 #### Kiểm thử Sprint 07
 
@@ -703,6 +705,8 @@ Phase A ──→ Phase B ──→ Phase C ──→ Phase D
 - Scar confidence: Chỉ authorized user validate
 - Scar map: Load floorplan + overlay markers chính xác vị trí
 - Recurrence: Tạo scar cùng area/type → count tăng
+- Scar CRUD: Tạo scar mới từ ScarMapView → hiển thị trên canvas, sửa scar → data cập nhật
+- Scar link: Thêm liên kết case/task → click được sang CaseDetail/TaskDetail
 
 ---
 
