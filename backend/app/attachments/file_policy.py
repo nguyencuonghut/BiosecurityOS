@@ -21,6 +21,7 @@ ALLOWED_MIME_TYPES: dict[str, int] = {
     "application/pdf": 20 * 1024 * 1024,
     # Excel/CSV — 20 MB max
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": 20 * 1024 * 1024,
+    "application/wps-office.xlsx": 20 * 1024 * 1024,
     "text/csv": 20 * 1024 * 1024,
 }
 
