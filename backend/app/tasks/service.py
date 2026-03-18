@@ -143,6 +143,7 @@ async def list_tasks(
     case_id: uuid.UUID | None = None,
     priority: str | None = None,
     status: str | None = None,
+    task_type: str | None = None,
     assignee_user_id: uuid.UUID | None = None,
     overdue: bool = False,
     page: int = 1,
@@ -154,6 +155,10 @@ async def list_tasks(
     if case_id:
         base = base.where(CorrectiveTask.case_id == case_id)
         count_q = count_q.where(CorrectiveTask.case_id == case_id)
+    if task_type:
+        _validate_task_type(task_type)
+        base = base.where(CorrectiveTask.task_type == task_type)
+        count_q = count_q.where(CorrectiveTask.task_type == task_type)
     if farm_id:
         from app.cases.models import RiskCase
         base = base.join(RiskCase, CorrectiveTask.case_id == RiskCase.id).where(RiskCase.farm_id == farm_id)
@@ -201,7 +206,7 @@ async def get_task(db: AsyncSession, task_id: uuid.UUID) -> CorrectiveTask:
             selectinload(CorrectiveTask.assignees),
             selectinload(CorrectiveTask.reviews),
             selectinload(CorrectiveTask.comments),
-            selectinload(CorrectiveTask.task_attachments),
+            selectinload(CorrectiveTask.task_attachments).selectinload(TaskAttachment.attachment),
         )
         .where(CorrectiveTask.id == task_id)
     )
@@ -365,6 +370,10 @@ async def create_review(
         raise AppException(422, "INVALID_REVIEW_RESULT",
                            f"review_result phải là: {', '.join(sorted(VALID_REVIEW_RESULTS))}")
 
+    # G3: Reject/needs_rework requires review_note
+    if data.review_result in ("rejected", "needs_rework") and not data.review_note:
+        raise AppException(422, "REVIEW_NOTE_REQUIRED", "Phải nhập lý do khi reject hoặc yêu cầu sửa lại.")
+
     review = TaskReview(
         task_id=task.id,
         reviewer_user_id=reviewer_user_id,
@@ -418,6 +427,16 @@ async def reject_task(
 # Comments (B06.6)
 # ═══════════════════════════════════════════════════════════════════
 
+async def list_comments(db: AsyncSession, task_id: uuid.UUID) -> list[TaskComment]:
+    await get_task(db, task_id)
+    result = await db.execute(
+        select(TaskComment)
+        .where(TaskComment.task_id == task_id)
+        .order_by(TaskComment.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
 async def create_comment(
     db: AsyncSession, task_id: uuid.UUID, data: TaskCommentCreate, author_user_id: uuid.UUID
 ) -> TaskComment:
@@ -443,6 +462,17 @@ async def create_comment(
 # ═══════════════════════════════════════════════════════════════════
 # Task Attachments (link attachment to task)
 # ═══════════════════════════════════════════════════════════════════
+
+async def list_task_attachments(db: AsyncSession, task_id: uuid.UUID) -> list[TaskAttachment]:
+    await get_task(db, task_id)
+    result = await db.execute(
+        select(TaskAttachment)
+        .options(selectinload(TaskAttachment.attachment))
+        .where(TaskAttachment.task_id == task_id)
+        .order_by(TaskAttachment.upload_stage)
+    )
+    return list(result.scalars().all())
+
 
 async def add_task_attachment(
     db: AsyncSession, task_id: uuid.UUID, data: TaskAttachmentCreate

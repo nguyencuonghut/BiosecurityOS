@@ -89,6 +89,18 @@ const routes = [
         component: () => import('@/views/cases/CaseDetailView.vue'),
         meta: { permission: 'CASE_CREATE' },
       },
+      {
+        path: 'tasks',
+        name: 'TaskList',
+        component: () => import('@/views/tasks/TaskListView.vue'),
+        meta: { permission: 'TASK_READ' },
+      },
+      {
+        path: 'tasks/:id',
+        name: 'TaskDetail',
+        component: () => import('@/views/tasks/TaskDetailView.vue'),
+        meta: { permission: 'TASK_READ' },
+      },
     ],
   },
   {

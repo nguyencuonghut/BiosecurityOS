@@ -19,12 +19,21 @@ from app.shared.exceptions import AppException, NotFoundException
 
 
 def _get_minio_client() -> Minio:
-    """Create MinIO async client from settings."""
+    """Create MinIO async client.
+
+    Uses MINIO_ENDPOINT (internal, e.g. minio:9000) for I/O, and
+    MINIO_EXTERNAL_ENDPOINT (browser-facing, e.g. localhost:9000) via
+    ``server_url`` so presigned URLs point to the host the browser can reach.
+    """
+    ext = settings.MINIO_EXTERNAL_ENDPOINT
+    scheme = "https" if settings.MINIO_USE_SSL else "http"
+    server_url = f"{scheme}://{ext}" if ext else None
     return Minio(
         settings.MINIO_ENDPOINT,
         access_key=settings.MINIO_ACCESS_KEY,
         secret_key=settings.MINIO_SECRET_KEY,
         secure=settings.MINIO_USE_SSL,
+        server_url=server_url,
     )
 
 
@@ -66,10 +75,8 @@ async def presign_upload(
     await db.flush()
     await db.refresh(attachment)
 
-    # Generate presigned PUT URL
+    # Generate presigned PUT URL + ensure bucket
     client = _get_minio_client()
-
-    # Ensure bucket exists
     found = await client.bucket_exists(bucket)
     if not found:
         await client.make_bucket(bucket)
@@ -156,11 +163,10 @@ async def get_download_url(db: AsyncSession, attachment_id: uuid.UUID) -> dict:
     if attachment.archived_at is not None:
         raise AppException(410, "ATTACHMENT_ARCHIVED", "Attachment đã bị xóa.")
 
-    client = _get_minio_client()
-
     from datetime import timedelta
     from urllib.parse import quote
 
+    client = _get_minio_client()
     download_url = await client.presigned_get_object(
         attachment.storage_bucket,
         attachment.object_key,
@@ -172,6 +178,34 @@ async def get_download_url(db: AsyncSession, attachment_id: uuid.UUID) -> dict:
 
     return {
         "download_url": download_url,
+        "file_name": attachment.file_name_original,
+        "mime_type": attachment.mime_type,
+    }
+
+
+async def get_view_url(db: AsyncSession, attachment_id: uuid.UUID) -> dict:
+    """Generate presigned GET URL for inline viewing in browser."""
+    attachment = await get_attachment(db, attachment_id)
+
+    if attachment.archived_at is not None:
+        raise AppException(410, "ATTACHMENT_ARCHIVED", "Attachment đã bị xóa.")
+
+    from datetime import timedelta
+    from urllib.parse import quote
+
+    client = _get_minio_client()
+    view_url = await client.presigned_get_object(
+        attachment.storage_bucket,
+        attachment.object_key,
+        expires=timedelta(hours=1),
+        response_headers={
+            "response-content-disposition": f'inline; filename="{quote(attachment.file_name_original)}"',
+            "response-content-type": attachment.mime_type,
+        },
+    )
+
+    return {
+        "view_url": view_url,
         "file_name": attachment.file_name_original,
         "mime_type": attachment.mime_type,
     }

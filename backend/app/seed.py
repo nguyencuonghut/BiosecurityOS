@@ -1,15 +1,45 @@
-"""Seed script for development: creates sample users for every role."""
+"""Comprehensive seed script: creates sample data for all modules.
+
+Builds a realistic demo environment with regions, farms, scorecards,
+assessments, killer events, trust scores, cases, RCA, tasks, etc.
+"""
 
 import asyncio
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import AppRole, AppUser, AppUserCredential, UserRole
+from app.auth.models import AppRole, AppUser, AppUserCredential, UserRole, Farm, Region
 from app.auth.security import hash_password
 from app.database import async_session_factory
 
-# (username, full_name, email, role_code)
+# Import all models so SQLAlchemy relationship registry is complete
+import app.farms.models  # noqa: F401
+import app.scorecards.models  # noqa: F401
+import app.assessments.models  # noqa: F401
+import app.killer_metrics.models  # noqa: F401
+import app.trust_scores.models  # noqa: F401
+import app.cases.models  # noqa: F401
+import app.tasks.models  # noqa: F401
+import app.attachments.models  # noqa: F401
+
+from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint
+from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
+from app.assessments.models import Assessment
+from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
+from app.trust_scores.models import TrustScoreSnapshot
+from app.cases.models import RiskCase, CaseParticipant, RcaRecord, RcaFactor
+from app.tasks.models import CorrectiveTask, TaskAssignee, TaskReview, TaskComment
+
+# ═══════════════════════════════════════════════════════════════
+# Constants
+# ═══════════════════════════════════════════════════════════════
+
+DEFAULT_PASSWORD = "Admin@2026"
+NOW = datetime.now(timezone.utc)
+
 SEED_USERS = [
     ("admin", "System Administrator", "admin@biosec.local", "SYSTEM_ADMIN"),
     ("region_mgr", "Nguyễn Văn Vùng", "region_mgr@biosec.local", "REGION_MANAGER"),
@@ -19,46 +49,536 @@ SEED_USERS = [
     ("viewer", "Hoàng Văn Xem", "viewer@biosec.local", "VIEWER"),
 ]
 
-DEFAULT_PASSWORD = "Admin@2026"
+
+# ═══════════════════════════════════════════════════════════════
+# 1. Users
+# ═══════════════════════════════════════════════════════════════
+
+async def seed_users(db: AsyncSession | None = None) -> dict[str, AppUser]:
+    """Create test users. Can be called standalone or as part of seed_all."""
+    standalone = db is None
+    if standalone:
+        db = async_session_factory()
+        await db.__aenter__()
+
+    users = {}
+    for username, full_name, email, role_code in SEED_USERS:
+        result = await db.execute(select(AppUser).where(AppUser.username == username))
+        existing = result.scalar_one_or_none()
+        if existing:
+            users[username] = existing
+            print(f"  User '{username}' already exists, skipping.")
+            continue
+
+        user = AppUser(username=username, full_name=full_name, email=email, status="active")
+        db.add(user)
+        await db.flush()
+
+        db.add(AppUserCredential(user_id=user.id, password_hash=hash_password(DEFAULT_PASSWORD)))
+
+        role_result = await db.execute(select(AppRole).where(AppRole.code == role_code))
+        role = role_result.scalar_one_or_none()
+        if role:
+            db.add(UserRole(user_id=user.id, role_id=role.id))
+
+        users[username] = user
+        print(f"  Created user: {username} / {role_code}")
+
+    if standalone:
+        await db.commit()
+        await db.__aexit__(None, None, None)
+
+    return users
 
 
-async def seed_users() -> None:
-    async with async_session_factory() as db:
-        for username, full_name, email, role_code in SEED_USERS:
-            # Skip if user already exists
-            result = await db.execute(select(AppUser).where(AppUser.username == username))
+# ═══════════════════════════════════════════════════════════════
+# 2. Regions & Farms
+# ═══════════════════════════════════════════════════════════════
+
+SEED_REGIONS = [
+    ("REG-NORTH", "Vùng Bắc"),
+    ("REG-CENTRAL", "Vùng Trung"),
+    ("REG-SOUTH", "Vùng Nam"),
+]
+
+SEED_FARMS = [
+    # (code, name, farm_type, ownership_type, region_code, capacity, risk_level, lat, lon, address)
+    ("FARM-N01", "Trại Hà Nam 1", "sow", "company", "REG-NORTH", 5000, "medium", 20.5833, 106.0000, "Xã Liêm Thuận, Thanh Liêm, Hà Nam"),
+    ("FARM-N02", "Trại Bắc Ninh 1", "finisher", "company", "REG-NORTH", 8000, "low", 21.1861, 106.0763, "Xã Phú Lâm, Tiên Du, Bắc Ninh"),
+    ("FARM-N03", "Trại Thái Bình 1", "mixed", "contract", "REG-NORTH", 3000, "high", 20.4500, 106.3333, "Xã Thụy Trường, Thái Thụy, Thái Bình"),
+    ("FARM-C01", "Trại Thanh Hóa 1", "sow", "company", "REG-CENTRAL", 6000, "medium", 19.8000, 105.7667, "Xã Hoằng Quỳ, Hoằng Hóa, Thanh Hóa"),
+    ("FARM-C02", "Trại Nghệ An 1", "finisher", "lease", "REG-CENTRAL", 4000, "medium", 18.6700, 105.6900, "Xã Nghi Long, Nghi Lộc, Nghệ An"),
+    ("FARM-S01", "Trại Đồng Nai 1", "sow", "company", "REG-SOUTH", 10000, "low", 10.9500, 106.8500, "Xã Sông Trầu, Trảng Bom, Đồng Nai"),
+    ("FARM-S02", "Trại Bình Dương 1", "mixed", "company", "REG-SOUTH", 7000, "medium", 11.3254, 106.4770, "Xã An Bình, Phú Giáo, Bình Dương"),
+    ("FARM-S03", "Trại Long An 1", "finisher", "contract", "REG-SOUTH", 5000, "high", 10.5333, 106.4167, "Xã Đức Hòa Thượng, Đức Hòa, Long An"),
+]
+
+SEED_AREAS = [
+    ("CLEAN", "Khu sạch", "production", "clean"),
+    ("BUFFER", "Khu đệm", "buffer", "buffer"),
+    ("DIRTY", "Khu bẩn", "logistics", "dirty"),
+    ("OFFICE", "Văn phòng", "office", None),
+    ("QUARANTINE", "Khu cách ly", "quarantine", "clean"),
+]
+
+
+async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
+    regions, farms, areas = {}, {}, {}
+
+    for code, name in SEED_REGIONS:
+        result = await db.execute(select(Region).where(Region.code == code))
+        existing = result.scalar_one_or_none()
+        if existing:
+            regions[code] = existing
+            continue
+        region = Region(code=code, name=name, manager_user_id=users["region_mgr"].id, status="active")
+        db.add(region)
+        regions[code] = region
+        print(f"  Created region: {code}")
+    await db.flush()
+
+    for code, name, farm_type, ownership, region_code, capacity, risk, lat, lon, address in SEED_FARMS:
+        result = await db.execute(select(Farm).where(Farm.code == code))
+        existing = result.scalar_one_or_none()
+        if existing:
+            farms[code] = existing
+            continue
+        farm = Farm(
+            code=code, name=name, farm_type=farm_type, ownership_type=ownership,
+            region_id=regions[region_code].id,
+            capacity_headcount=capacity, baseline_risk_level=risk,
+            latitude=Decimal(str(lat)), longitude=Decimal(str(lon)),
+            address=address, operational_status="active", opened_at=date(2024, 1, 15),
+        )
+        db.add(farm)
+        farms[code] = farm
+        print(f"  Created farm: {code} — {name}")
+    await db.flush()
+
+    for farm_code, farm in farms.items():
+        for suffix, area_name, area_type, cdc in SEED_AREAS:
+            area_code = f"{farm_code}-{suffix}"
+            result = await db.execute(select(FarmArea).where(FarmArea.code == area_code))
             if result.scalar_one_or_none():
-                print(f"User '{username}' already exists, skipping.")
                 continue
-
-            user = AppUser(
-                username=username,
-                full_name=full_name,
-                email=email,
-                status="active",
+            area = FarmArea(
+                farm_id=farm.id, code=area_code, name=area_name,
+                area_type=area_type, clean_dirty_class=cdc, is_active=True,
             )
-            db.add(user)
+            db.add(area)
+            areas[(farm_code, suffix)] = area
+    await db.flush()
+
+    for farm_code, farm in farms.items():
+        clean = areas.get((farm_code, "CLEAN"))
+        buffer = areas.get((farm_code, "BUFFER"))
+        dirty = areas.get((farm_code, "DIRTY"))
+        if clean and buffer and dirty:
+            for from_a, to_a in [(dirty, buffer), (buffer, clean)]:
+                db.add(FarmRoute(
+                    farm_id=farm.id, route_type="vehicle",
+                    from_area_id=from_a.id, to_area_id=to_a.id,
+                    direction_rule="one_way",
+                    note="Chỉ di chuyển một chiều từ bẩn → sạch",
+                ))
+
+    for farm_code in ["FARM-N03", "FARM-S03"]:
+        farm = farms.get(farm_code)
+        if not farm:
+            continue
+        db.add(ExternalRiskPoint(
+            farm_id=farm.id, risk_type="market",
+            name="Chợ gia súc lân cận", latitude=farm.latitude + Decimal("0.01"),
+            longitude=farm.longitude + Decimal("0.01"), distance_m=800,
+            note="Chợ buôn bán gia súc, hoạt động hàng tuần", confidence_level="confirmed",
+        ))
+        db.add(ExternalRiskPoint(
+            farm_id=farm.id, risk_type="dump",
+            name="Bãi rác lộ thiên", latitude=farm.latitude - Decimal("0.005"),
+            longitude=farm.longitude + Decimal("0.008"), distance_m=1200,
+            note="Bãi rác có nguy cơ thu hút động vật gây bệnh", confidence_level="probable",
+        ))
+    await db.flush()
+    print(f"  Created {len(areas)} farm areas, routes, risk points")
+    return regions, farms, areas
+
+
+# ═══════════════════════════════════════════════════════════════
+# 3. Scorecard Templates
+# ═══════════════════════════════════════════════════════════════
+
+SCORECARD_SECTIONS = [
+    ("HW", "Hạ tầng & cơ sở vật chất", "hardware", Decimal("30"), 1),
+    ("PR", "Quy trình & SOP", "software", Decimal("30"), 2),
+    ("BH", "Hành vi & tuân thủ", "behavior", Decimal("25"), 3),
+    ("MN", "Giám sát & cảnh báo", "monitoring", Decimal("15"), 4),
+]
+
+ITEMS_PER_SECTION = {
+    "HW": [
+        ("Hàng rào bao quanh trại nguyên vẹn", "yes_no", 10, False),
+        ("Cổng ra vào có khóa & kiểm soát", "yes_no", 10, False),
+        ("Khu cách ly đúng quy cách", "score_0_5", 10, False),
+        ("Hệ thống sát trùng xe tải hoạt động", "yes_no", 10, True),
+        ("Kho chứa cám cách ly đúng cách", "score_0_5", 10, False),
+    ],
+    "PR": [
+        ("SOP tiếp nhận heo mới", "yes_no", 10, False),
+        ("SOP xử lý heo chết", "yes_no", 10, True),
+        ("Lịch sát trùng định kỳ", "score_0_5", 10, False),
+        ("Quy trình kiểm tra sức khỏe hàng ngày", "score_0_5", 10, False),
+        ("SOP quản lý khách/xe ra vào", "yes_no", 10, False),
+    ],
+    "BH": [
+        ("Nhân viên thay đồ trước khi vào khu sạch", "yes_no", 10, False),
+        ("Tắm sát trùng trước khi vào chuồng", "yes_no", 10, True),
+        ("Không mang thức ăn bên ngoài vào trại", "yes_no", 10, True),
+        ("Ghi chép đầy đủ sổ theo dõi ATSH", "score_0_5", 10, False),
+    ],
+    "MN": [
+        ("Camera giám sát hoạt động 24/7", "yes_no", 10, False),
+        ("Hệ thống cảnh báo nhiệt độ/ẩm độ", "score_0_5", 10, False),
+        ("Báo cáo ATSH hàng tuần", "yes_no", 10, False),
+    ],
+}
+
+
+async def _seed_scorecards(db: AsyncSession) -> dict:
+    templates = {}
+    TEMPLATES = [
+        ("SC-SOW-V1", "Scorecard ATSH — Trại nái", "sow", 1),
+        ("SC-FIN-V1", "Scorecard ATSH — Trại thịt", "finisher", 1),
+        ("SC-MIX-V1", "Scorecard ATSH — Trại hỗn hợp", "mixed", 1),
+    ]
+    for t_code, t_name, farm_type, ver in TEMPLATES:
+        result = await db.execute(select(ScorecardTemplate).where(ScorecardTemplate.code == t_code))
+        existing = result.scalar_one_or_none()
+        if existing:
+            templates[t_code] = existing
+            continue
+
+        template = ScorecardTemplate(
+            code=t_code, name=t_name, farm_type=farm_type,
+            version_no=ver, status="active", effective_from=date(2026, 1, 1),
+        )
+        db.add(template)
+        await db.flush()
+        templates[t_code] = template
+
+        for s_suffix, s_name, s_type, s_weight, s_order in SCORECARD_SECTIONS:
+            section = ScorecardSection(
+                template_id=template.id, code=f"{t_code}-{s_suffix}", name=s_name,
+                section_type=s_type, weight=s_weight, display_order=s_order,
+            )
+            db.add(section)
             await db.flush()
 
-            cred = AppUserCredential(
-                user_id=user.id,
-                password_hash=hash_password(DEFAULT_PASSWORD),
-            )
-            db.add(cred)
+            for idx, (q_text, resp_type, max_score, is_killer) in enumerate(ITEMS_PER_SECTION.get(s_suffix, []), 1):
+                db.add(ScorecardItem(
+                    section_id=section.id, code=f"{t_code}-{s_suffix}-{idx:02d}",
+                    question_text=q_text, response_type=resp_type,
+                    max_score=Decimal(str(max_score)), weight=Decimal("1"),
+                    is_killer_related=is_killer, display_order=idx,
+                ))
 
-            # Assign role
-            role_result = await db.execute(select(AppRole).where(AppRole.code == role_code))
-            role = role_result.scalar_one_or_none()
-            if role:
-                db.add(UserRole(user_id=user.id, role_id=role.id))
+        print(f"  Created scorecard: {t_code}")
+    await db.flush()
+    return templates
 
-            print(f"Created user: {username} / {role_code} (id={user.id})")
+
+# ═══════════════════════════════════════════════════════════════
+# 4. Assessments
+# ═══════════════════════════════════════════════════════════════
+
+FARM_TEMPLATE_MAP = {"sow": "SC-SOW-V1", "finisher": "SC-FIN-V1", "mixed": "SC-MIX-V1"}
+
+ASSESSMENT_DATA = [
+    ("FARM-N01", "self", "farm_mgr", "78.5", "82", "75", "80", "76"),
+    ("FARM-N01", "scheduled_audit", "auditor", "72.0", "78", "68", "74", "66"),
+    ("FARM-N02", "self", "farm_mgr", "85.0", "88", "82", "86", "82"),
+    ("FARM-N02", "scheduled_audit", "auditor", "80.5", "84", "78", "82", "76"),
+    ("FARM-C01", "self", "farm_mgr", "65.0", "70", "60", "68", "60"),
+    ("FARM-C01", "scheduled_audit", "auditor", "55.0", "62", "50", "58", "48"),
+    ("FARM-S01", "self", "farm_mgr", "90.0", "92", "88", "90", "90"),
+    ("FARM-S01", "scheduled_audit", "auditor", "88.0", "90", "86", "88", "88"),
+    ("FARM-S03", "self", "farm_mgr", "50.0", "55", "45", "52", "46"),
+    ("FARM-S03", "scheduled_audit", "auditor", "42.0", "48", "38", "44", "36"),
+]
+
+
+async def _seed_assessments(db: AsyncSession, farms: dict, templates: dict, users: dict) -> dict:
+    assessments = {}
+    for farm_code, a_type, performer, overall, hw, pr, bh, mn in ASSESSMENT_DATA:
+        farm = farms.get(farm_code)
+        if not farm:
+            continue
+        t_code = FARM_TEMPLATE_MAP.get(farm.farm_type)
+        template = templates.get(t_code)
+        if not template:
+            continue
+
+        key = f"{farm_code}_{a_type}"
+        assess = Assessment(
+            farm_id=farm.id, template_id=template.id, assessment_type=a_type,
+            assessment_date=NOW - timedelta(days=14),
+            performed_by_user_id=users[performer].id,
+            performed_by_name_snapshot=users[performer].full_name,
+            overall_score=Decimal(overall), hardware_score=Decimal(hw),
+            process_score=Decimal(pr), behavior_score=Decimal(bh),
+            monitoring_score=Decimal(mn), status="reviewed",
+            summary_note=f"Đánh giá {a_type} cho {farm.name}",
+        )
+        db.add(assess)
+        assessments[key] = assess
+
+    await db.flush()
+    print(f"  Created {len(assessments)} assessments")
+    return assessments
+
+
+# ═══════════════════════════════════════════════════════════════
+# 5. Trust Scores
+# ═══════════════════════════════════════════════════════════════
+
+async def _seed_trust_scores(db: AsyncSession, farms: dict, assessments: dict) -> None:
+    count = 0
+    for farm_code in ["FARM-N01", "FARM-N02", "FARM-C01", "FARM-S01", "FARM-S03"]:
+        self_a = assessments.get(f"{farm_code}_self")
+        audit_a = assessments.get(f"{farm_code}_scheduled_audit")
+        if not self_a or not audit_a:
+            continue
+        gap = abs(self_a.overall_score - audit_a.overall_score)
+        trust = max(Decimal("0"), Decimal("100") - gap * Decimal("2"))
+        db.add(TrustScoreSnapshot(
+            farm_id=farms[farm_code].id,
+            source_self_assessment_id=self_a.id, source_audit_assessment_id=audit_a.id,
+            trust_score=trust, absolute_gap_score=gap,
+            snapshot_date=date.today(), note=f"Trust score for {farms[farm_code].name}",
+        ))
+        count += 1
+    await db.flush()
+    print(f"  Created {count} trust score snapshots")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 6. Killer Metric Events
+# ═══════════════════════════════════════════════════════════════
+
+async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users: dict) -> list:
+    result = await db.execute(select(KillerMetricDefinition))
+    defs = {d.code: d for d in result.scalars().all()}
+
+    events = []
+    EVENTS = [
+        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Phát hiện thức ăn thừa không rõ nguồn gốc trong khu sạch"),
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe tải vào khu bẩn không qua sát trùng"),
+        ("FARM-C01", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Heo chết không được xử lý đúng quy trình trong 4h"),
+        ("FARM-N01", "DIRTY", "UNKNOWN_VISITOR", "farm_mgr", "Người lạ vào khu vực trại không đăng ký"),
+    ]
+    for farm_code, area_suffix, def_code, detector, summary in EVENTS:
+        farm = farms.get(farm_code)
+        area = areas.get((farm_code, area_suffix))
+        defn = defs.get(def_code)
+        if not farm or not defn:
+            continue
+        event = KillerMetricEvent(
+            farm_id=farm.id, area_id=area.id if area else None,
+            definition_id=defn.id,
+            event_at=NOW - timedelta(days=7, hours=len(events) * 3),
+            detected_by_user_id=users[detector].id,
+            source_type="manual", summary=summary, status="open",
+        )
+        db.add(event)
+        events.append(event)
+    await db.flush()
+    print(f"  Created {len(events)} killer metric events")
+    return events
+
+
+# ═══════════════════════════════════════════════════════════════
+# 7. Risk Cases & RCA
+# ═══════════════════════════════════════════════════════════════
+
+CASE_DATA = [
+    ("RC-2026-001", "FARM-N03", "Sự cố thức ăn lạ khu sạch", "killer_event", "P0", "critical", "in_analysis"),
+    ("RC-2026-002", "FARM-S03", "Vi phạm vùng đỏ — xe không sát trùng", "killer_event", "P0", "critical", "actioning"),
+    ("RC-2026-003", "FARM-C01", "Vi phạm quy trình xử lý heo chết", "killer_event", "P0", "critical", "open"),
+    ("RC-2026-004", "FARM-N01", "Người lạ xâm nhập khu vực trại", "killer_event", "P1", "high", "monitoring"),
+    ("RC-2026-005", "FARM-C01", "Điểm ATSH thấp — quy trình yếu", "assessment_gap", "P2", "medium", "triage"),
+    ("RC-2026-006", "FARM-S03", "Điểm trust score thấp — gap lớn", "trust_gap", "P1", "high", "in_analysis"),
+]
+
+
+async def _seed_cases(db: AsyncSession, farms: dict, users: dict) -> dict:
+    cases = {}
+    for case_no, farm_code, title, c_type, priority, severity, status in CASE_DATA:
+        farm = farms.get(farm_code)
+        if not farm:
+            continue
+        case = RiskCase(
+            farm_id=farm.id, case_no=case_no, case_type=c_type,
+            title=title, summary=f"Case demo: {title}",
+            priority=priority, severity=severity, current_status=status,
+            assigned_expert_user_id=users["expert"].id,
+            first_response_due_at=NOW + timedelta(hours=4) if priority == "P0" else NOW + timedelta(days=1),
+            closure_due_at=NOW + timedelta(days=7) if priority in ("P0", "P1") else NOW + timedelta(days=14),
+        )
+        db.add(case)
+        cases[case_no] = case
+    await db.flush()
+
+    for case in cases.values():
+        db.add(CaseParticipant(case_id=case.id, user_id=users["expert"].id, role_in_case="owner"))
+        db.add(CaseParticipant(case_id=case.id, user_id=users["farm_mgr"].id, role_in_case="farm_contact"))
+    await db.flush()
+
+    for case_no in ["RC-2026-001", "RC-2026-002", "RC-2026-006"]:
+        case = cases.get(case_no)
+        if not case:
+            continue
+        rca = RcaRecord(
+            case_id=case.id, method="5_why",
+            problem_statement=f"Phân tích nguyên nhân gốc rễ cho {case.title}",
+            direct_cause="Thiếu kiểm soát tại điểm ra vào",
+            system_cause="SOP chưa được cập nhật đúng chu kỳ",
+            behavioral_cause="Nhân viên chưa được đào tạo lại",
+            conclusion_confidence="high",
+            analyzed_by_user_id=users["expert"].id,
+        )
+        db.add(rca)
+        await db.flush()
+        db.add(RcaFactor(
+            rca_record_id=rca.id, factor_group="process",
+            factor_text="SOP kiểm soát ra vào chưa cập nhật quy trình mới",
+            confidence_level="high", is_primary=True,
+        ))
+        db.add(RcaFactor(
+            rca_record_id=rca.id, factor_group="people",
+            factor_text="Nhân viên bảo vệ bỏ vị trí trong giờ nghỉ trưa",
+            confidence_level="medium", is_primary=False,
+        ))
+    await db.flush()
+    print(f"  Created {len(cases)} risk cases with participants, RCA")
+    return cases
+
+
+# ═══════════════════════════════════════════════════════════════
+# 8. Corrective Tasks
+# ═══════════════════════════════════════════════════════════════
+
+TASK_DATA = [
+    ("TASK-2026-001", "RC-2026-001", "Lắp camera giám sát khu sạch", "corrective", "P0", "in_progress", "farm_mgr"),
+    ("TASK-2026-002", "RC-2026-001", "Cập nhật SOP kiểm soát thức ăn", "preventive", "P1", "open", "expert"),
+    ("TASK-2026-003", "RC-2026-002", "Sửa chữa hệ thống sát trùng xe", "corrective", "P0", "pending_review", "farm_mgr"),
+    ("TASK-2026-004", "RC-2026-002", "Đào tạo lại nhân viên bảo vệ", "preventive", "P1", "accepted", "farm_mgr"),
+    ("TASK-2026-005", "RC-2026-003", "Xây dựng SOP xử lý heo chết mới", "corrective", "P0", "open", "expert"),
+    ("TASK-2026-006", "RC-2026-004", "Lắp đặt barrier tự động cổng vào", "corrective", "P1", "closed", "farm_mgr"),
+    ("TASK-2026-007", "RC-2026-005", "Nâng cấp hạ tầng sát trùng khu đệm", "corrective", "P2", "open", "farm_mgr"),
+    ("TASK-2026-008", "RC-2026-006", "Kiểm tra chéo tự đánh giá và audit", "preventive", "P1", "in_progress", "auditor"),
+]
+
+
+async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
+    count = 0
+    tasks_to_close = []
+    for task_no, case_no, title, t_type, priority, status, assignee in TASK_DATA:
+        case = cases.get(case_no)
+        if not case:
+            continue
+
+        # Insert closed tasks as 'open' first (DB trigger requires review before close)
+        insert_status = "open" if status == "closed" else status
+        task = CorrectiveTask(
+            case_id=case.id, task_no=task_no, title=title,
+            description=f"Nhiệm vụ khắc phục: {title}. Yêu cầu hoàn thành theo SLA.",
+            task_type=t_type, priority=priority, status=insert_status,
+            sla_due_at=NOW + timedelta(days=3) if priority == "P0" else NOW + timedelta(days=7),
+            completion_due_at=NOW + timedelta(days=7) if priority == "P0" else NOW + timedelta(days=14),
+            completion_criteria="Hoàn thành và có bằng chứng xác nhận",
+            evidence_requirement="Ảnh chụp hiện trường trước/sau xử lý",
+            created_by_user_id=users["expert"].id,
+        )
+        db.add(task)
+        await db.flush()
+
+        db.add(TaskAssignee(
+            task_id=task.id, user_id=users[assignee].id,
+            responsibility_type="owner",
+            accepted_at=NOW - timedelta(days=2) if status != "open" else None,
+        ))
+
+        if status == "pending_review":
+            db.add(TaskReview(
+                task_id=task.id, reviewer_user_id=users["expert"].id,
+                review_result="needs_rework", review_note="Đang xem xét bằng chứng đã nộp",
+            ))
+        if status == "closed":
+            # Add review first, then mark for closing
+            db.add(TaskReview(
+                task_id=task.id, reviewer_user_id=users["expert"].id,
+                review_result="approved", review_note="Đã xác nhận hoàn thành, bằng chứng đạt yêu cầu",
+            ))
+            db.add(TaskComment(
+                task_id=task.id, author_user_id=users["farm_mgr"].id,
+                comment_text="Đã lắp đặt xong barrier tự động, gửi ảnh bằng chứng",
+                comment_type="update",
+            ))
+            tasks_to_close.append(task)
+        if status == "in_progress":
+            db.add(TaskComment(
+                task_id=task.id, author_user_id=users[assignee].id,
+                comment_text="Đã bắt đầu triển khai, dự kiến hoàn thành trong 3 ngày",
+                comment_type="update",
+            ))
+        count += 1
+    await db.flush()
+
+    # Now close tasks that need it (review already exists)
+    for task in tasks_to_close:
+        task.status = "closed"
+        task.closed_by_user_id = users["expert"].id
+        task.closed_at = NOW - timedelta(days=1)
+    await db.flush()
+    print(f"  Created {count} corrective tasks with assignees, reviews, comments")
+
+
+# ═══════════════════════════════════════════════════════════════
+# Main orchestrator
+# ═══════════════════════════════════════════════════════════════
+
+async def seed_all() -> None:
+    """Run all seed functions in order."""
+    async with async_session_factory() as db:
+        print("\n[1/8] Seeding users...")
+        users = await seed_users(db)
+
+        print("\n[2/8] Seeding regions & farms...")
+        _regions, farms, areas = await _seed_regions_and_farms(db, users)
+
+        print("\n[3/8] Seeding scorecard templates...")
+        templates = await _seed_scorecards(db)
+
+        print("\n[4/8] Seeding assessments...")
+        assessments = await _seed_assessments(db, farms, templates, users)
+
+        print("\n[5/8] Seeding trust scores...")
+        await _seed_trust_scores(db, farms, assessments)
+
+        print("\n[6/8] Seeding killer metric events...")
+        await _seed_killer_events(db, farms, areas, users)
+
+        print("\n[7/8] Seeding risk cases & RCA...")
+        cases = await _seed_cases(db, farms, users)
+
+        print("\n[8/8] Seeding corrective tasks...")
+        await _seed_tasks(db, cases, users)
 
         await db.commit()
+        print("\n✓ All sample data seeded successfully!")
 
 
 async def main():
-    await seed_users()
+    await seed_all()
 
 
 if __name__ == "__main__":

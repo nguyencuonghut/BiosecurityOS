@@ -84,6 +84,7 @@ class TaskAttachment(UUIDPrimaryKeyMixin, Base):
     caption: Mapped[str | None] = mapped_column(Text)
 
     task: Mapped["CorrectiveTask"] = relationship(back_populates="task_attachments")
+    attachment = relationship("Attachment", lazy="raise")
 
 
 class TaskReview(UUIDPrimaryKeyMixin, Base):

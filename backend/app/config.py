@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # ── MinIO
     MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_EXTERNAL_ENDPOINT: str = ""  # browser-facing URL, e.g. localhost:9000
     MINIO_ACCESS_KEY: str = "minio_dev"
     MINIO_SECRET_KEY: str = "minio_dev_2026"
     MINIO_BUCKET: str = "biosec-evidence"

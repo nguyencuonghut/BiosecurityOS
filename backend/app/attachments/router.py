@@ -61,6 +61,20 @@ async def download_attachment(
     return success_response(request, data)
 
 
+@attachment_router.get("/{attachment_id}/view", dependencies=[require_permission("ATTACHMENT_READ")])
+async def view_attachment(
+    request: Request,
+    attachment_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    result = await service.get_view_url(db, attachment_id)
+    return success_response(request, {
+        "view_url": result["view_url"],
+        "file_name": result["file_name"],
+        "mime_type": result["mime_type"],
+    })
+
+
 @attachment_router.delete("/{attachment_id}", dependencies=[require_permission("ATTACHMENT_DELETE")])
 async def delete_attachment(
     request: Request,

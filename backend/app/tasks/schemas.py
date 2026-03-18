@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -45,6 +45,30 @@ class TaskAttachmentOut(BaseModel):
     upload_stage: str
     is_primary_evidence: bool
     caption: str | None
+
+
+class TaskAttachmentDetailOut(TaskAttachmentOut):
+    """Enriched schema with nested attachment metadata (file name, mime, size)."""
+    file_name_original: str | None = None
+    mime_type: str | None = None
+    file_size_bytes: int | None = None
+    captured_at: datetime | None = None
+    uploaded_at: datetime | None = None
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _extract_attachment(cls, values, handler):
+        """Extract fields from the nested .attachment relationship when using from_attributes."""
+        if hasattr(values, "attachment") and values.attachment is not None:
+            att = values.attachment
+            obj = handler(values)
+            obj.file_name_original = getattr(att, "file_name_original", None)
+            obj.mime_type = getattr(att, "mime_type", None)
+            obj.file_size_bytes = getattr(att, "file_size_bytes", None)
+            obj.captured_at = getattr(att, "captured_at", None)
+            obj.uploaded_at = getattr(att, "uploaded_at", None)
+            return obj
+        return handler(values)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -119,7 +143,8 @@ class TaskUpdate(BaseModel):
     version: int
 
 
-class TaskOut(BaseModel):
+class TaskListOut(BaseModel):
+    """Lightweight schema for list endpoints (no nested reviews/comments/attachments)."""
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -144,6 +169,13 @@ class TaskOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     assignees: list[TaskAssigneeOut] = []
+
+
+class TaskOut(TaskListOut):
+    """Full schema for detail endpoint (includes nested reviews/comments/attachments)."""
+    reviews: list[TaskReviewOut] = []
+    comments: list[TaskCommentOut] = []
+    task_attachments: list[TaskAttachmentDetailOut] = []
 
 
 class ChangeTaskStatusRequest(BaseModel):

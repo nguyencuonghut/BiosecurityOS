@@ -22,8 +22,17 @@ logs-all:                        ## Xem logs tất cả services
 migrate:                         ## Chạy DB migration
 	docker compose exec backend alembic upgrade head
 
-seed:                            ## Seed reference data
+seed:                            ## Seed sample data (users, farms, scorecards, cases, tasks...)
 	docker compose exec backend python -m app.seed
+
+reset-data:                      ## Reset DB + MinIO (xóa data, chạy lại migration + seed)
+	docker compose exec backend python -m app.reset_data
+
+reset-db:                        ## Reset DB only
+	docker compose exec backend python -m app.reset_data --db
+
+reset-minio:                     ## Reset MinIO only (xóa tất cả file đã upload)
+	docker compose exec backend python -m app.reset_data --minio
 
 test:                            ## Chạy test suite
 	docker compose exec backend pytest --cov=app --cov-report=term-missing

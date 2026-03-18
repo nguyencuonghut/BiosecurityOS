@@ -33,6 +33,7 @@ async def list_tasks(
     case_id: Annotated[uuid.UUID | None, Query()] = None,
     priority: Annotated[str | None, Query()] = None,
     status: Annotated[str | None, Query()] = None,
+    task_type: Annotated[str | None, Query()] = None,
     assignee_user_id: Annotated[uuid.UUID | None, Query()] = None,
     overdue: Annotated[bool, Query()] = False,
 ):
@@ -42,12 +43,13 @@ async def list_tasks(
         case_id=case_id,
         priority=priority,
         status=status,
+        task_type=task_type,
         assignee_user_id=assignee_user_id,
         overdue=overdue,
         page=pagination.page,
         page_size=pagination.page_size,
     )
-    data = [schemas.TaskOut.model_validate(t).model_dump(mode="json") for t in items]
+    data = [schemas.TaskListOut.model_validate(t).model_dump(mode="json") for t in items]
     return paginated_response(request, data, total, pagination)
 
 
@@ -171,6 +173,17 @@ async def remove_assignee(
 # Task Attachments (link attachment to task)
 # ═══════════════════════════════════════════════════════════════════
 
+@task_router.get("/{task_id}/attachments", dependencies=[require_permission("TASK_READ")])
+async def list_task_attachments(
+    request: Request,
+    task_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    items = await service.list_task_attachments(db, task_id)
+    data = [schemas.TaskAttachmentDetailOut.model_validate(a).model_dump(mode="json") for a in items]
+    return success_response(request, data)
+
+
 @task_router.post("/{task_id}/attachments", dependencies=[require_permission("TASK_CREATE")])
 async def add_task_attachment(
     request: Request,
@@ -229,7 +242,7 @@ async def approve_task(
 
 
 class RejectRequest(BaseModel):
-    review_note: str | None = None
+    review_note: str
     next_action_due_at: datetime | None = None
 
 
@@ -246,9 +259,33 @@ async def reject_task(
     return success_response(request, data, status_code=201)
 
 
+@task_router.post("/{task_id}/request-rework", dependencies=[require_permission("TASK_REVIEW")])
+async def request_rework(
+    request: Request,
+    task_id: uuid.UUID,
+    payload: RejectRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    review = await service.reject_task(db, task_id, user.id, payload.review_note, payload.next_action_due_at)
+    data = schemas.TaskReviewOut.model_validate(review).model_dump(mode="json")
+    return success_response(request, data, status_code=201)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Comments (B06.6)
 # ═══════════════════════════════════════════════════════════════════
+
+@task_router.get("/{task_id}/comments", dependencies=[require_permission("TASK_READ")])
+async def list_comments(
+    request: Request,
+    task_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    items = await service.list_comments(db, task_id)
+    data = [schemas.TaskCommentOut.model_validate(c).model_dump(mode="json") for c in items]
+    return success_response(request, data)
+
 
 @task_router.post("/{task_id}/comments", dependencies=[require_permission("TASK_READ")])
 async def create_comment(
