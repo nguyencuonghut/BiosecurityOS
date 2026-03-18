@@ -177,7 +177,7 @@ onMounted(() => store.fetchDefinitions())
 </template>
 
 <style scoped>
-.km-def-page { max-width: 960px; }
+.km-def-page { width: 100%; }
 
 .page-header {
   display: flex;
@@ -203,7 +203,8 @@ onMounted(() => store.fetchDefinitions())
 }
 
 .code-badge {
-  background: var(--p-surface-100);
+  background: var(--p-surface-border);
+  color: var(--p-text-color);
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
