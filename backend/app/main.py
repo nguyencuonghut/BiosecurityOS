@@ -76,6 +76,7 @@ from app.attachments.router import attachment_router
 from app.floorplans.router import farm_floorplan_router, floorplan_router
 from app.scars.router import scar_router, scar_map_router
 from app.lessons.router import lesson_router, lesson_search_router
+from app.dashboards.router import dashboard_router
 
 # Ensure all ORM models are discovered by SQLAlchemy
 import app.farms.models as _farms_models  # noqa: F401
@@ -113,3 +114,4 @@ app.include_router(scar_router, prefix=settings.API_V1_PREFIX + "/scars", tags=[
 app.include_router(scar_map_router, prefix=settings.API_V1_PREFIX + "/farms", tags=["scars"])
 app.include_router(lesson_router, prefix=settings.API_V1_PREFIX + "/lessons", tags=["lessons"])
 app.include_router(lesson_search_router, prefix=settings.API_V1_PREFIX + "/lessons/search", tags=["lessons"])
+app.include_router(dashboard_router, prefix=settings.API_V1_PREFIX + "/dashboards", tags=["dashboards"])
