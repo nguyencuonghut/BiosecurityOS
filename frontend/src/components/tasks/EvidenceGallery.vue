@@ -13,6 +13,8 @@ const props = defineProps({
   taskAttachments: { type: Array, default: () => [] },
 })
 
+const emit = defineEmits(['deleted'])
+
 const previewVisible = ref(false)
 const previewUrl = ref('')
 const previewName = ref('')
@@ -99,6 +101,30 @@ async function downloadFile(ta) {
     loadingId.value = null
   }
 }
+
+// ── Delete ──
+const confirmVisible = ref(false)
+const deleteTarget = ref(null)
+const deleting = ref(false)
+
+function confirmDelete(ta) {
+  deleteTarget.value = ta
+  confirmVisible.value = true
+}
+
+async function executeDelete() {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await attachSvc.deleteAttachment(deleteTarget.value.attachment_id)
+    confirmVisible.value = false
+    emit('deleted')
+  } catch {
+    // keep dialog open on error
+  } finally {
+    deleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -136,6 +162,15 @@ async function downloadFile(ta) {
                 :loading="loadingId === ta.attachment_id"
                 @click.stop="downloadFile(ta)"
               />
+              <Button
+                icon="pi pi-trash"
+                size="small"
+                text
+                rounded
+                severity="danger"
+                title="Xóa file"
+                @click.stop="confirmDelete(ta)"
+              />
             </div>
           </div>
         </div>
@@ -143,6 +178,18 @@ async function downloadFile(ta) {
     </template>
 
     <p v-if="!taskAttachments?.length" class="empty-msg">Chưa có bằng chứng nào được tải lên.</p>
+
+    <!-- Delete Confirmation Dialog -->
+    <Dialog v-model:visible="confirmVisible" header="Xác nhận xóa" modal :style="{ width: '420px' }">
+      <div class="confirm-body">
+        <i class="pi pi-exclamation-triangle confirm-icon"></i>
+        <p>Bạn có chắc muốn xóa file <strong>{{ deleteTarget?.file_name_original }}</strong>?</p>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" text @click="confirmVisible = false" />
+        <Button label="Xóa" severity="danger" icon="pi pi-trash" :loading="deleting" @click="executeDelete" />
+      </template>
+    </Dialog>
 
     <!-- Preview Dialog -->
     <Dialog v-model:visible="previewVisible" :header="previewName" modal :style="{ width: '80vw', maxWidth: '900px' }">
@@ -221,4 +268,9 @@ async function downloadFile(ta) {
 .preview-video { max-width: 100%; max-height: 70vh; border-radius: 4px; }
 .preview-fallback { padding: 2rem; }
 .download-link { color: var(--p-primary-color); text-decoration: underline; font-weight: 600; }
+
+/* Confirm dialog */
+.confirm-body { display: flex; align-items: flex-start; gap: 1rem; padding: 0.5rem 0; }
+.confirm-icon { font-size: 1.75rem; color: var(--p-red-500); flex-shrink: 0; margin-top: 0.15rem; }
+.confirm-body p { margin: 0; line-height: 1.5; }
 </style>

@@ -199,6 +199,11 @@ async function onEvidenceUploaded() {
   await store.fetchTask(task.value.id)
 }
 
+async function onEvidenceDeleted() {
+  toast.add({ severity: 'success', summary: 'Xóa thành công', detail: 'File bằng chứng đã được xóa', life: 3000 })
+  await store.fetchTask(task.value.id)
+}
+
 // ── Helpers ──
 function priorityColor(p) {
   const m = { P0: 'danger', P1: 'warn', P2: 'info', P3: 'secondary' }
@@ -426,7 +431,7 @@ onMounted(async () => {
               :task-id="task.id"
               @uploaded="onEvidenceUploaded"
             />
-            <EvidenceGallery :task-attachments="task.task_attachments || []" />
+            <EvidenceGallery :task-attachments="task.task_attachments || []" @deleted="onEvidenceDeleted" />
           </div>
         </TabPanel>
 

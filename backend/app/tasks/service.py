@@ -213,6 +213,11 @@ async def get_task(db: AsyncSession, task_id: uuid.UUID) -> CorrectiveTask:
     task = result.scalar_one_or_none()
     if not task:
         raise NotFoundException("Corrective task not found.")
+    # Filter out soft-deleted attachments
+    task.task_attachments = [
+        ta for ta in task.task_attachments
+        if ta.attachment is None or ta.attachment.archived_at is None
+    ]
     return task
 
 
@@ -465,10 +470,13 @@ async def create_comment(
 
 async def list_task_attachments(db: AsyncSession, task_id: uuid.UUID) -> list[TaskAttachment]:
     await get_task(db, task_id)
+    from app.attachments.models import Attachment
     result = await db.execute(
         select(TaskAttachment)
+        .join(TaskAttachment.attachment)
         .options(selectinload(TaskAttachment.attachment))
         .where(TaskAttachment.task_id == task_id)
+        .where(Attachment.archived_at.is_(None))
         .order_by(TaskAttachment.upload_stage)
     )
     return list(result.scalars().all())
