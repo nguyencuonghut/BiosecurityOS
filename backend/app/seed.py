@@ -26,6 +26,7 @@ import app.tasks.models  # noqa: F401
 import app.attachments.models  # noqa: F401
 import app.floorplans.models  # noqa: F401
 import app.scars.models  # noqa: F401
+import app.lessons.models  # noqa: F401
 
 from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint
 from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
@@ -36,6 +37,7 @@ from app.cases.models import RiskCase, CaseParticipant, RcaRecord, RcaFactor
 from app.tasks.models import CorrectiveTask, TaskAssignee, TaskReview, TaskComment
 from app.floorplans.models import FloorplanVersion, FloorplanMarker
 from app.scars.models import ScarRecord, ScarLink
+from app.lessons.models import LessonLearned, LessonReference, SimilarityTag
 
 # ═══════════════════════════════════════════════════════════════
 # Constants
@@ -675,41 +677,156 @@ async def _seed_scars(db: AsyncSession, farms: dict, areas: dict, floorplans: di
 
 
 # ═══════════════════════════════════════════════════════════════
+# Step 11: Lesson Learned + References + Tags
+# ═══════════════════════════════════════════════════════════════
+
+LESSON_DATA = [
+    {
+        "lesson_no": "LL-2026-0001",
+        "title": "Quy trình sát trùng cổng chính giảm 90% nguy cơ lây nhiễm",
+        "problem_context": "Trại FARM-N03 phát hiện ổ dịch lan từ cổng chính do xe vận chuyển không qua sát trùng.",
+        "root_cause_summary": "Thiếu hố sát trùng tại cổng, xe ra vào không được kiểm soát.",
+        "action_summary": "Lắp hố sát trùng bắt buộc, gắn camera giám sát, huấn luyện bảo vệ.",
+        "outcome_summary": "Sau 3 tháng không ghi nhận lây nhiễm qua cổng chính.",
+        "recurrence_observed": False,
+        "applicability_scope": "Tất cả trại có cổng xe vận chuyển",
+        "confidence_level": "confirmed",
+        "status": "validated",
+        "tags": [("farm_type", "sow"), ("issue_type", "vehicle_hygiene"), ("other", "gate")],
+    },
+    {
+        "lesson_no": "LL-2026-0002",
+        "title": "Giám sát đường đi nội bộ ngăn ngừa lây chéo giữa khu vực",
+        "problem_context": "Trại FARM-S03 phát hiện vi phạm lặp lại: nhân viên đi tắt qua khu cách ly.",
+        "root_cause_summary": "Bản đồ đường đi không rõ ràng, thiếu biển cấm, hàng rào khu cách ly thấp.",
+        "action_summary": "Vẽ lại sơ đồ đường đi, nâng hàng rào, lắp cảm biến chuyển động tại lối tắt.",
+        "outcome_summary": "Vi phạm giảm 85% sau 2 tháng triển khai.",
+        "recurrence_observed": False,
+        "applicability_scope": "Trại có khu cách ly tiếp giáp khu nuôi",
+        "confidence_level": "confirmed",
+        "status": "validated",
+        "tags": [("farm_type", "finisher"), ("issue_type", "route_violation"), ("route_type", "internal_path")],
+    },
+    {
+        "lesson_no": "LL-2026-0003",
+        "title": "Xử lý heo chết tại chỗ vs vận chuyển ra ngoài",
+        "problem_context": "Trại FARM-C01 xử lý xác heo chết bằng cách vận chuyển bằng xe ra bãi rác bên ngoài, gây rủi ro lây lan.",
+        "root_cause_summary": "Chưa có phương án xử lý xác tại chỗ, thiếu hố ủ compost.",
+        "action_summary": "Xây hố ủ compost, mua máy tiêu hủy, quy trình xử lý tại chỗ.",
+        "outcome_summary": "Đang triển khai, chưa đủ dữ liệu đánh giá hiệu quả.",
+        "recurrence_observed": True,
+        "applicability_scope": "Trại chăn nuôi quy mô vừa trở lên",
+        "confidence_level": "probable",
+        "status": "draft",
+        "tags": [("farm_type", "farrow_to_finish"), ("issue_type", "dead_animal_disposal"), ("season", "rainy")],
+    },
+]
+
+
+async def _seed_lessons(db: AsyncSession, cases: dict, users: dict) -> None:
+    """Seed lesson learned + references + tags."""
+    # Check existence
+    existing = await db.execute(
+        select(LessonLearned).where(LessonLearned.lesson_no == "LL-2026-0001")
+    )
+    if existing.scalar_one_or_none():
+        print("  Lessons already exist, skipping.")
+        return
+
+    expert = users.get("expert")
+    count = 0
+    for ld in LESSON_DATA:
+        # Insert as draft first (DB trigger requires reference before validated)
+        lesson = LessonLearned(
+            lesson_no=ld["lesson_no"],
+            title=ld["title"],
+            problem_context=ld["problem_context"],
+            root_cause_summary=ld["root_cause_summary"],
+            action_summary=ld["action_summary"],
+            outcome_summary=ld["outcome_summary"],
+            recurrence_observed=ld["recurrence_observed"],
+            applicability_scope=ld["applicability_scope"],
+            confidence_level=ld["confidence_level"],
+            status="draft",
+        )
+        db.add(lesson)
+        await db.flush()
+
+        # Add tags
+        for tag_type, tag_value in ld["tags"]:
+            db.add(SimilarityTag(
+                lesson_id=lesson.id,
+                tag_type=tag_type,
+                tag_value=tag_value,
+            ))
+
+        # Link lessons to cases
+        case_map = {
+            "LL-2026-0001": "RC-2026-001",
+            "LL-2026-0002": "RC-2026-002",
+            "LL-2026-0003": "RC-2026-003",
+        }
+        case_no = case_map.get(ld["lesson_no"])
+        if case_no and case_no in cases:
+            db.add(LessonReference(
+                lesson_id=lesson.id,
+                reference_type="case",
+                reference_id=cases[case_no].id,
+                contribution_note=f"Bài học rút ra từ case {case_no}",
+            ))
+        await db.flush()
+
+        # Now set status to validated if needed
+        if ld["status"] == "validated":
+            lesson.status = "validated"
+            lesson.confirmed_by_user_id = expert.id if expert else None
+            lesson.confirmed_at = NOW - timedelta(days=10)
+            await db.flush()
+
+        count += 1
+    await db.flush()
+    print(f"  Created {count} lesson learned with references and tags")
+
+
+# ═══════════════════════════════════════════════════════════════
 # Main orchestrator
 # ═══════════════════════════════════════════════════════════════
 
 async def seed_all() -> None:
     """Run all seed functions in order."""
     async with async_session_factory() as db:
-        print("\n[1/10] Seeding users...")
+        print("\n[1/11] Seeding users...")
         users = await seed_users(db)
 
-        print("\n[2/10] Seeding regions & farms...")
+        print("\n[2/11] Seeding regions & farms...")
         _regions, farms, areas = await _seed_regions_and_farms(db, users)
 
-        print("\n[3/10] Seeding scorecard templates...")
+        print("\n[3/11] Seeding scorecard templates...")
         templates = await _seed_scorecards(db)
 
-        print("\n[4/10] Seeding assessments...")
+        print("\n[4/11] Seeding assessments...")
         assessments = await _seed_assessments(db, farms, templates, users)
 
-        print("\n[5/10] Seeding trust scores...")
+        print("\n[5/11] Seeding trust scores...")
         await _seed_trust_scores(db, farms, assessments)
 
-        print("\n[6/10] Seeding killer metric events...")
+        print("\n[6/11] Seeding killer metric events...")
         await _seed_killer_events(db, farms, areas, users)
 
-        print("\n[7/10] Seeding risk cases & RCA...")
+        print("\n[7/11] Seeding risk cases & RCA...")
         cases = await _seed_cases(db, farms, users)
 
-        print("\n[8/10] Seeding corrective tasks...")
+        print("\n[8/11] Seeding corrective tasks...")
         await _seed_tasks(db, cases, users)
 
-        print("\n[9/10] Seeding floorplans & markers...")
+        print("\n[9/11] Seeding floorplans & markers...")
         floorplans = await _seed_floorplans(db, farms, areas, users)
 
-        print("\n[10/10] Seeding scar records & links...")
+        print("\n[10/11] Seeding scar records & links...")
         await _seed_scars(db, farms, areas, floorplans, cases, users)
+
+        print("\n[11/11] Seeding lesson learned...")
+        await _seed_lessons(db, cases, users)
 
         await db.commit()
         print("\n✓ All sample data seeded successfully!")
