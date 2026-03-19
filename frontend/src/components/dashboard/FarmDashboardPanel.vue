@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -41,15 +41,23 @@ async function loadData() {
 onMounted(loadData)
 watch(() => props.farmId, loadData)
 
+function getTextColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--p-text-color').trim() || '#333'
+}
+
+const scoreChartOption = computed(() => buildScoreChartOption(data.value?.scores_over_time))
+const trustChartOption = computed(() => buildTrustChartOption(data.value?.trust_trend))
+
 function buildScoreChartOption(scores) {
   if (!scores || !scores.length) return {}
+  const textColor = getTextColor()
   const dates = scores.map((s) => s.date)
   return {
     tooltip: { trigger: 'axis' },
-    legend: { bottom: 0 },
+    legend: { bottom: 0, textStyle: { color: textColor } },
     grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: { type: 'category', data: dates },
-    yAxis: { type: 'value', name: 'Điểm', min: 0, max: 100 },
+    xAxis: { type: 'category', data: dates, axisLabel: { color: textColor } },
+    yAxis: { type: 'value', name: 'Điểm', min: 0, max: 100, nameTextStyle: { color: textColor }, axisLabel: { color: textColor } },
     series: [
       { name: 'Tổng', type: 'line', data: scores.map((s) => s.overall_score), smooth: true, itemStyle: { color: '#3B82F6' } },
       { name: 'Hạ tầng', type: 'line', data: scores.map((s) => s.hardware_score), smooth: true, itemStyle: { color: '#10B981' } },
@@ -62,11 +70,13 @@ function buildScoreChartOption(scores) {
 
 function buildTrustChartOption(trend) {
   if (!trend || !trend.length) return {}
+  const textColor = getTextColor()
   return {
     tooltip: { trigger: 'axis' },
+    legend: { textStyle: { color: textColor } },
     grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
-    xAxis: { type: 'category', data: trend.map((t) => t.date) },
-    yAxis: { type: 'value', name: 'Điểm', min: 0, max: 100 },
+    xAxis: { type: 'category', data: trend.map((t) => t.date), axisLabel: { color: textColor } },
+    yAxis: { type: 'value', name: 'Điểm', min: 0, max: 100, nameTextStyle: { color: textColor }, axisLabel: { color: textColor } },
     series: [
       { name: 'Trust Score', type: 'line', data: trend.map((t) => t.trust_score), smooth: true, areaStyle: { opacity: 0.2 }, itemStyle: { color: '#3B82F6' } },
       { name: 'Gap Score', type: 'line', data: trend.map((t) => t.gap_score), smooth: true, lineStyle: { type: 'dashed' }, itemStyle: { color: '#EF4444' } },
