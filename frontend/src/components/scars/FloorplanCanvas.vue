@@ -29,6 +29,15 @@ const emit = defineEmits(['markerClick', 'scarClick', 'canvasClick', 'markerDrag
 
 const hoveredMarker = ref(null)
 const hoveredScar = ref(null)
+const imageRef = ref(null)
+const canvasAspect = ref('16 / 10')  // default, updated on image load
+
+function onImageLoad() {
+  const img = imageRef.value
+  if (img && img.naturalWidth && img.naturalHeight) {
+    canvasAspect.value = `${img.naturalWidth} / ${img.naturalHeight}`
+  }
+}
 
 // ── Drag state ────────────────────────────────────────────────
 const draggingMarker = ref(null)
@@ -36,16 +45,27 @@ const dragOffset = ref({ x: 0, y: 0 })
 const canvasRef = ref(null)
 const didDrag = ref(false)
 
+function getContentOrigin(el) {
+  const rect = el.getBoundingClientRect()
+  const style = getComputedStyle(el)
+  return {
+    x: rect.left + (parseFloat(style.borderLeftWidth) || 0),
+    y: rect.top + (parseFloat(style.borderTopWidth) || 0),
+    w: el.clientWidth,
+    h: el.clientHeight,
+  }
+}
+
 function onMarkerPointerDown(event, marker) {
   if (props.readonly) return
   event.preventDefault()
   event.stopPropagation()
   didDrag.value = false
   draggingMarker.value = { ...marker }
-  const rect = canvasRef.value.getBoundingClientRect()
+  const c = getContentOrigin(canvasRef.value)
   dragOffset.value = {
-    x: event.clientX - (marker.x_percent / 100) * rect.width - rect.left,
-    y: event.clientY - (marker.y_percent / 100) * rect.height - rect.top,
+    x: event.clientX - (marker.x_percent / 100) * c.w - c.x,
+    y: event.clientY - (marker.y_percent / 100) * c.h - c.y,
   }
   document.addEventListener('pointermove', onPointerMove)
   document.addEventListener('pointerup', onPointerUp)
@@ -54,9 +74,9 @@ function onMarkerPointerDown(event, marker) {
 function onPointerMove(event) {
   if (!draggingMarker.value || !canvasRef.value) return
   didDrag.value = true
-  const rect = canvasRef.value.getBoundingClientRect()
-  let x = ((event.clientX - rect.left - dragOffset.value.x) / rect.width) * 100
-  let y = ((event.clientY - rect.top - dragOffset.value.y) / rect.height) * 100
+  const c = getContentOrigin(canvasRef.value)
+  let x = ((event.clientX - c.x - dragOffset.value.x) / c.w) * 100
+  let y = ((event.clientY - c.y - dragOffset.value.y) / c.h) * 100
   x = Math.max(0, Math.min(100, x))
   y = Math.max(0, Math.min(100, y))
   draggingMarker.value.x_percent = Math.round(x * 10) / 10
@@ -89,7 +109,18 @@ function onMarkerClicked(event, marker) {
   emit('markerClick', marker)
 }
 
-// Computed: merge dragging position into markers for display
+// ── Canvas click handler ──────────────────────────────────────
+function onCanvasClick(event) {
+  if (props.readonly) return
+  const c = getContentOrigin(event.currentTarget)
+  const x_percent = ((event.clientX - c.x) / c.w) * 100
+  const y_percent = ((event.clientY - c.y) / c.h) * 100
+  emit('canvasClick', {
+    x_percent: Math.round(x_percent * 10) / 10,
+    y_percent: Math.round(y_percent * 10) / 10,
+  })
+}
+
 function displayX(m) {
   if (draggingMarker.value && draggingMarker.value.id === m.id) return draggingMarker.value.x_percent
   return m.x_percent
@@ -146,18 +177,6 @@ function getScarColor(type) {
 
 function confidenceOpacity(level) {
   return { confirmed: 1, probable: 0.75, suspected: 0.5 }[level] || 0.6
-}
-
-// ── Canvas click handler ──────────────────────────────────────
-function onCanvasClick(event) {
-  if (props.readonly) return
-  const rect = event.currentTarget.getBoundingClientRect()
-  const x_percent = ((event.clientX - rect.left) / rect.width) * 100
-  const y_percent = ((event.clientY - rect.top) / rect.height) * 100
-  emit('canvasClick', {
-    x_percent: Math.round(x_percent * 10) / 10,
-    y_percent: Math.round(y_percent * 10) / 10,
-  })
 }
 
 // ── Legend items ──────────────────────────────────────────────
@@ -228,14 +247,16 @@ const markerLegendItems = computed(() => {
 <template>
   <div class="floorplan-canvas">
     <!-- Canvas area -->
-    <div ref="canvasRef" class="canvas-area" @click="onCanvasClick">
+    <div ref="canvasRef" class="canvas-area" :style="{ aspectRatio: canvasAspect }" @click="onCanvasClick">
       <!-- Floorplan image background -->
       <img
         v-if="imageUrl"
+        ref="imageRef"
         :src="imageUrl"
         class="floorplan-image"
         alt="Floorplan"
         draggable="false"
+        @load="onImageLoad"
       />
       <!-- Grid pattern background (fallback when no image) -->
       <svg v-else class="grid-bg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
@@ -364,7 +385,7 @@ const markerLegendItems = computed(() => {
 .canvas-area {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  /* aspect-ratio set dynamically via :style to match loaded image */
   background: var(--p-surface-100);
   border: 1px solid var(--p-surface-300);
   border-radius: var(--p-border-radius);

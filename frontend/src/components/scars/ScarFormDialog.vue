@@ -49,8 +49,17 @@ const dialogTitle = computed(() => isEdit.value ? 'Sửa Scar' : 'Tạo Scar m�
 
 // ── Minimap picker ────────────────────────────────────────────
 const minimapRef = ref(null)
+const minimapImgRef = ref(null)
 const minimapImageUrl = ref(null)
 const loadingMinimap = ref(false)
+const minimapAspect = ref('16 / 10')
+
+function onMinimapImageLoad() {
+  const img = minimapImgRef.value
+  if (img && img.naturalWidth && img.naturalHeight) {
+    minimapAspect.value = `${img.naturalWidth} / ${img.naturalHeight}`
+  }
+}
 
 // ── Form fields ───────────────────────────────────────────────
 const form = ref(emptyForm())
@@ -148,9 +157,13 @@ async function loadMinimapImage(farmId) {
 }
 
 function onMinimapClick(event) {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const x = ((event.clientX - rect.left) / rect.width) * 100
-  const y = ((event.clientY - rect.top) / rect.height) * 100
+  const el = event.currentTarget
+  const rect = el.getBoundingClientRect()
+  const style = getComputedStyle(el)
+  const ox = rect.left + (parseFloat(style.borderLeftWidth) || 0)
+  const oy = rect.top + (parseFloat(style.borderTopWidth) || 0)
+  const x = ((event.clientX - ox) / el.clientWidth) * 100
+  const y = ((event.clientY - oy) / el.clientHeight) * 100
   form.value.x_percent = Math.round(x * 10) / 10
   form.value.y_percent = Math.round(y * 10) / 10
 }
@@ -306,16 +319,14 @@ function formatDateISO(d) {
       <!-- Position picker -->
       <div class="form-row">
         <label>Vị trí trên sơ đồ mặt bằng</label>
-        <div class="minimap-picker" v-if="minimapImageUrl" ref="minimapRef" @click="onMinimapClick">
-          <img :src="minimapImageUrl" class="minimap-image" alt="Floorplan" draggable="false" />
+        <div class="minimap-picker" v-if="minimapImageUrl" ref="minimapRef" :style="{ aspectRatio: minimapAspect }" @click="onMinimapClick">
+          <img :src="minimapImageUrl" ref="minimapImgRef" class="minimap-image" alt="Floorplan" draggable="false" @load="onMinimapImageLoad" />
           <!-- Pin at selected position -->
           <div
             v-if="form.x_percent != null && form.y_percent != null"
             class="minimap-pin"
             :style="{ left: form.x_percent + '%', top: form.y_percent + '%' }"
-          >
-            <i class="pi pi-map-marker" />
-          </div>
+          />
           <div class="minimap-hint">Click để chọn vị trí</div>
         </div>
         <div v-else-if="loadingMinimap" class="minimap-empty">
@@ -404,7 +415,7 @@ function formatDateISO(d) {
 .minimap-picker {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  /* aspect-ratio set dynamically via :style to match loaded image */
   border: 2px solid var(--p-surface-300);
   border-radius: 8px;
   overflow: hidden;
@@ -426,17 +437,20 @@ function formatDateISO(d) {
 }
 .minimap-pin {
   position: absolute;
-  transform: translate(-50%, -100%);
-  color: var(--p-red-500);
-  font-size: 1.5rem;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background: var(--p-red-500);
+  border: 2px solid white;
+  border-radius: 50%;
   z-index: 5;
-  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
   pointer-events: none;
   animation: pin-drop 0.3s ease-out;
 }
 @keyframes pin-drop {
-  0% { transform: translate(-50%, -150%); opacity: 0; }
-  100% { transform: translate(-50%, -100%); opacity: 1; }
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 .minimap-hint {
   position: absolute;
