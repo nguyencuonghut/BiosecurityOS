@@ -409,8 +409,7 @@ function goPrevSection() {
 
 <style scoped>
 .assessment-form {
-  max-width: 1200px;
-  margin: 0 auto;
+  /* no max-width — match other pages */
 }
 
 /* ── Header Card ── */

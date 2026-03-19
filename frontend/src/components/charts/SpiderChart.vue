@@ -60,10 +60,13 @@ const option = computed(() => {
       indicator,
       shape: 'polygon',
       splitNumber: 5,
+      radius: '55%',
+      center: ['50%', '50%'],
       axisName: {
         color: '#666',
         fontSize: 13,
         fontWeight: 600,
+        overflow: 'none',
       },
       splitArea: {
         areaStyle: { color: ['#fff', '#f8f9fa', '#fff', '#f8f9fa', '#fff'] },
@@ -77,7 +80,7 @@ const option = computed(() => {
 <template>
   <div class="spider-chart-wrapper">
     <div class="chart-container">
-      <VChart :option="option" autoresize style="height: 340px; min-width: 340px" />
+      <VChart :option="option" autoresize style="height: 340px; min-width: 420px" />
     </div>
     <div class="score-summary">
       <div v-if="overallScore != null" class="score-item overall-row">
