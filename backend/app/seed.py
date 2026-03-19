@@ -120,11 +120,15 @@ SEED_FARMS = [
 ]
 
 SEED_AREAS = [
+    ("GATE", "Cổng chính", "gate", "dirty"),
     ("CLEAN", "Khu sạch", "production", "clean"),
     ("BUFFER", "Khu đệm", "buffer", "buffer"),
     ("DIRTY", "Khu bẩn", "logistics", "dirty"),
     ("OFFICE", "Văn phòng", "office", None),
     ("QUARANTINE", "Khu cách ly", "quarantine", "clean"),
+    ("SHOWER", "Nhà tắm sát trùng", "buffer_zone", "buffer"),
+    ("FEED_STORE", "Kho cám", "storage", "dirty"),
+    ("DEAD_PIG", "Khu xử lý heo chết", "yard", "dirty"),
 ]
 
 
@@ -176,10 +180,16 @@ async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
     await db.flush()
 
     for farm_code, farm in farms.items():
+        gate = areas.get((farm_code, "GATE"))
         clean = areas.get((farm_code, "CLEAN"))
         buffer = areas.get((farm_code, "BUFFER"))
         dirty = areas.get((farm_code, "DIRTY"))
+        shower = areas.get((farm_code, "SHOWER"))
+        feed_store = areas.get((farm_code, "FEED_STORE"))
+        dead_pig = areas.get((farm_code, "DEAD_PIG"))
+        quarantine = areas.get((farm_code, "QUARANTINE"))
         if clean and buffer and dirty:
+            # Vehicle routes: dirty → buffer → clean (one way)
             for from_a, to_a in [(dirty, buffer), (buffer, clean)]:
                 db.add(FarmRoute(
                     farm_id=farm.id, route_type="vehicle",
@@ -187,6 +197,44 @@ async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
                     direction_rule="one_way",
                     note="Chỉ di chuyển một chiều từ bẩn → sạch",
                 ))
+        if gate and shower:
+            # Person route: gate → shower → buffer → clean
+            db.add(FarmRoute(
+                farm_id=farm.id, route_type="person",
+                from_area_id=gate.id, to_area_id=shower.id,
+                direction_rule="one_way",
+                note="Người vào trại phải qua nhà tắm sát trùng",
+            ))
+        if shower and buffer:
+            db.add(FarmRoute(
+                farm_id=farm.id, route_type="person",
+                from_area_id=shower.id, to_area_id=buffer.id,
+                direction_rule="one_way",
+                note="Sau khi tắm sát trùng, vào khu đệm",
+            ))
+        if buffer and clean:
+            db.add(FarmRoute(
+                farm_id=farm.id, route_type="person",
+                from_area_id=buffer.id, to_area_id=clean.id,
+                direction_rule="one_way",
+                note="Từ khu đệm vào khu sạch",
+            ))
+        if dead_pig and dirty:
+            # Deadstock route: clean → dead_pig zone (one way)
+            db.add(FarmRoute(
+                farm_id=farm.id, route_type="deadstock",
+                from_area_id=clean.id, to_area_id=dead_pig.id,
+                direction_rule="one_way",
+                note="Xác chết chỉ di chuyển ra ngoài, không quay lại",
+            ))
+        if feed_store and buffer:
+            # Feed route: feed_store → buffer (restricted)
+            db.add(FarmRoute(
+                farm_id=farm.id, route_type="feed",
+                from_area_id=feed_store.id, to_area_id=buffer.id,
+                direction_rule="restricted",
+                note="Cám chỉ được vận chuyển qua khu đệm sau khi sát trùng",
+            ))
 
     for farm_code in ["FARM-N03", "FARM-S03"]:
         farm = farms.get(farm_code)
@@ -299,22 +347,52 @@ async def _seed_scorecards(db: AsyncSession) -> dict:
 FARM_TEMPLATE_MAP = {"sow": "SC-SOW-V1", "finisher": "SC-FIN-V1", "mixed": "SC-MIX-V1"}
 
 ASSESSMENT_DATA = [
-    ("FARM-N01", "self", "farm_mgr", "78.5", "82", "75", "80", "76"),
-    ("FARM-N01", "scheduled_audit", "auditor", "72.0", "78", "68", "74", "66"),
-    ("FARM-N02", "self", "farm_mgr", "85.0", "88", "82", "86", "82"),
-    ("FARM-N02", "scheduled_audit", "auditor", "80.5", "84", "78", "82", "76"),
-    ("FARM-C01", "self", "farm_mgr", "65.0", "70", "60", "68", "60"),
-    ("FARM-C01", "scheduled_audit", "auditor", "55.0", "62", "50", "58", "48"),
-    ("FARM-S01", "self", "farm_mgr", "90.0", "92", "88", "90", "90"),
-    ("FARM-S01", "scheduled_audit", "auditor", "88.0", "90", "86", "88", "88"),
-    ("FARM-S03", "self", "farm_mgr", "50.0", "55", "45", "52", "46"),
-    ("FARM-S03", "scheduled_audit", "auditor", "42.0", "48", "38", "44", "36"),
+    # Current round (14 days ago)
+    ("FARM-N01", "self", "farm_mgr", "78.5", "82", "75", "80", "76", 14),
+    ("FARM-N01", "scheduled_audit", "auditor", "72.0", "78", "68", "74", "66", 14),
+    ("FARM-N02", "self", "farm_mgr", "85.0", "88", "82", "86", "82", 14),
+    ("FARM-N02", "scheduled_audit", "auditor", "80.5", "84", "78", "82", "76", 14),
+    ("FARM-N03", "self", "farm_mgr", "45.0", "50", "40", "48", "40", 14),
+    ("FARM-N03", "scheduled_audit", "auditor", "38.0", "42", "34", "40", "34", 14),
+    ("FARM-C01", "self", "farm_mgr", "65.0", "70", "60", "68", "60", 14),
+    ("FARM-C01", "scheduled_audit", "auditor", "55.0", "62", "50", "58", "48", 14),
+    ("FARM-C02", "self", "farm_mgr", "70.0", "74", "66", "72", "66", 14),
+    ("FARM-C02", "scheduled_audit", "auditor", "66.0", "70", "62", "68", "62", 14),
+    ("FARM-S01", "self", "farm_mgr", "90.0", "92", "88", "90", "90", 14),
+    ("FARM-S01", "scheduled_audit", "auditor", "88.0", "90", "86", "88", "88", 14),
+    ("FARM-S02", "self", "farm_mgr", "75.0", "78", "72", "76", "72", 14),
+    ("FARM-S02", "scheduled_audit", "auditor", "71.0", "74", "68", "72", "68", 14),
+    ("FARM-S03", "self", "farm_mgr", "50.0", "55", "45", "52", "46", 14),
+    ("FARM-S03", "scheduled_audit", "auditor", "42.0", "48", "38", "44", "36", 14),
+    # 3 months ago
+    ("FARM-N01", "self", "farm_mgr", "72.0", "76", "68", "74", "68", 90),
+    ("FARM-N01", "scheduled_audit", "auditor", "65.0", "70", "60", "68", "60", 90),
+    ("FARM-N02", "self", "farm_mgr", "80.0", "82", "78", "82", "76", 90),
+    ("FARM-C01", "self", "farm_mgr", "58.0", "64", "52", "60", "54", 90),
+    ("FARM-C01", "scheduled_audit", "auditor", "48.0", "54", "42", "50", "44", 90),
+    ("FARM-S01", "self", "farm_mgr", "86.0", "88", "84", "86", "86", 90),
+    ("FARM-S01", "scheduled_audit", "auditor", "84.0", "86", "82", "84", "84", 90),
+    ("FARM-S03", "self", "farm_mgr", "44.0", "50", "38", "46", "40", 90),
+    ("FARM-S03", "scheduled_audit", "auditor", "36.0", "42", "30", "38", "32", 90),
+    # 6 months ago
+    ("FARM-N01", "self", "farm_mgr", "68.0", "72", "64", "70", "64", 180),
+    ("FARM-N01", "scheduled_audit", "auditor", "60.0", "64", "56", "62", "56", 180),
+    ("FARM-N02", "self", "farm_mgr", "76.0", "78", "74", "78", "72", 180),
+    ("FARM-C01", "self", "farm_mgr", "52.0", "58", "46", "54", "48", 180),
+    ("FARM-S01", "self", "farm_mgr", "82.0", "84", "80", "82", "82", 180),
+    ("FARM-S01", "scheduled_audit", "auditor", "80.0", "82", "78", "80", "80", 180),
+    ("FARM-S03", "self", "farm_mgr", "40.0", "46", "34", "42", "36", 180),
+    ("FARM-S03", "scheduled_audit", "auditor", "32.0", "38", "26", "34", "28", 180),
+    # 9 months ago
+    ("FARM-N01", "self", "farm_mgr", "62.0", "66", "58", "64", "58", 270),
+    ("FARM-S01", "self", "farm_mgr", "78.0", "80", "76", "78", "78", 270),
+    ("FARM-S03", "self", "farm_mgr", "35.0", "40", "30", "36", "32", 270),
 ]
 
 
 async def _seed_assessments(db: AsyncSession, farms: dict, templates: dict, users: dict) -> dict:
     assessments = {}
-    for farm_code, a_type, performer, overall, hw, pr, bh, mn in ASSESSMENT_DATA:
+    for farm_code, a_type, performer, overall, hw, pr, bh, mn, days_ago in ASSESSMENT_DATA:
         farm = farms.get(farm_code)
         if not farm:
             continue
@@ -323,10 +401,10 @@ async def _seed_assessments(db: AsyncSession, farms: dict, templates: dict, user
         if not template:
             continue
 
-        key = f"{farm_code}_{a_type}"
+        key = f"{farm_code}_{a_type}_{days_ago}"
         assess = Assessment(
             farm_id=farm.id, template_id=template.id, assessment_type=a_type,
-            assessment_date=NOW - timedelta(days=14),
+            assessment_date=NOW - timedelta(days=days_ago),
             performed_by_user_id=users[performer].id,
             performed_by_name_snapshot=users[performer].full_name,
             overall_score=Decimal(overall), hardware_score=Decimal(hw),
@@ -348,18 +426,44 @@ async def _seed_assessments(db: AsyncSession, farms: dict, templates: dict, user
 
 async def _seed_trust_scores(db: AsyncSession, farms: dict, assessments: dict) -> None:
     count = 0
-    for farm_code in ["FARM-N01", "FARM-N02", "FARM-C01", "FARM-S01", "FARM-S03"]:
-        self_a = assessments.get(f"{farm_code}_self")
-        audit_a = assessments.get(f"{farm_code}_scheduled_audit")
+    # Multiple snapshots — each needs matching self + audit assessments
+    # Use (farm_code, days_ago_for_assessment) pairs based on ASSESSMENT_DATA
+    TRUST_DATA = [
+        # (farm_code, trust_score, gap, snapshot_days_ago, assessment_days_ago)
+        # Current round — assessments at day 14
+        ("FARM-N01", Decimal("87"), Decimal("6.5"), 0, 14),
+        ("FARM-N02", Decimal("91"), Decimal("4.5"), 0, 14),
+        ("FARM-N03", Decimal("42"), Decimal("29"), 0, 14),
+        ("FARM-C01", Decimal("58"), Decimal("21"), 0, 14),
+        ("FARM-C02", Decimal("72"), Decimal("14"), 0, 14),
+        ("FARM-S01", Decimal("96"), Decimal("2"), 0, 14),
+        ("FARM-S02", Decimal("78"), Decimal("11"), 0, 14),
+        ("FARM-S03", Decimal("34"), Decimal("33"), 0, 14),
+        # 3 months ago — only farms with audit at 90 days
+        ("FARM-N01", Decimal("82"), Decimal("9"), 90, 90),
+        ("FARM-S01", Decimal("94"), Decimal("3"), 90, 90),
+        ("FARM-C01", Decimal("50"), Decimal("25"), 90, 90),
+        ("FARM-S03", Decimal("30"), Decimal("35"), 90, 90),
+        # 6 months ago
+        ("FARM-N01", Decimal("76"), Decimal("12"), 180, 180),
+        ("FARM-S01", Decimal("92"), Decimal("4"), 180, 180),
+        ("FARM-S03", Decimal("26"), Decimal("37"), 180, 180),
+    ]
+    for farm_code, trust, gap, snap_days, assess_days in TRUST_DATA:
+        farm = farms.get(farm_code)
+        if not farm:
+            continue
+        self_a = assessments.get(f"{farm_code}_self_{assess_days}")
+        audit_a = assessments.get(f"{farm_code}_scheduled_audit_{assess_days}")
         if not self_a or not audit_a:
             continue
-        gap = abs(self_a.overall_score - audit_a.overall_score)
-        trust = max(Decimal("0"), Decimal("100") - gap * Decimal("2"))
         db.add(TrustScoreSnapshot(
-            farm_id=farms[farm_code].id,
-            source_self_assessment_id=self_a.id, source_audit_assessment_id=audit_a.id,
+            farm_id=farm.id,
+            source_self_assessment_id=self_a.id,
+            source_audit_assessment_id=audit_a.id,
             trust_score=trust, absolute_gap_score=gap,
-            snapshot_date=date.today(), note=f"Trust score for {farms[farm_code].name}",
+            snapshot_date=date.today() - timedelta(days=snap_days),
+            note=f"Trust score for {farm.name}",
         ))
         count += 1
     await db.flush()
@@ -376,12 +480,31 @@ async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users:
 
     events = []
     EVENTS = [
-        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Phát hiện thức ăn thừa không rõ nguồn gốc trong khu sạch"),
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe tải vào khu bẩn không qua sát trùng"),
-        ("FARM-C01", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Heo chết không được xử lý đúng quy trình trong 4h"),
-        ("FARM-N01", "DIRTY", "UNKNOWN_VISITOR", "farm_mgr", "Người lạ vào khu vực trại không đăng ký"),
+        # (farm_code, area_suffix, def_code, detector, summary, days_ago, status)
+        # Current month
+        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Phát hiện thức ăn thừa không rõ nguồn gốc trong khu sạch", 3, "open"),
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe tải vào khu bẩn không qua sát trùng", 5, "open"),
+        ("FARM-C01", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Heo chết không được xử lý đúng quy trình trong 4h", 7, "open"),
+        ("FARM-N01", "DIRTY", "UNKNOWN_VISITOR", "farm_mgr", "Người lạ vào khu vực trại không đăng ký", 10, "under_review"),
+        # 1 month ago
+        ("FARM-S03", "CLEAN", "SWILL_FEED", "expert", "Nhân viên mang đồ ăn ngoài vào khu sạch", 35, "contained"),
+        ("FARM-N03", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Xe lạ không đăng ký vào cổng trại", 40, "contained"),
+        ("FARM-C01", "DIRTY", "RED_LINE_BREACH", "expert", "Nhân viên đi tắt qua khu bẩn không thay đồ", 42, "contained"),
+        # 2 months ago
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Vi phạm vùng đỏ lần 2 — xe cám không sát trùng", 65, "contained"),
+        ("FARM-N03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Xác heo chết để quá 6h trong khu đệm", 70, "contained"),
+        ("FARM-S02", "CLEAN", "SWILL_FEED", "farm_mgr", "Phát hiện thức ăn thừa gần chuồng nái", 75, "contained"),
+        # 3 months ago
+        ("FARM-N03", "DIRTY", "RED_LINE_BREACH", "expert", "Xe vận chuyển không qua hố sát trùng", 95, "contained"),
+        ("FARM-C01", "CLEAN", "UNKNOWN_VISITOR", "farm_mgr", "Kỹ thuật viên bên ngoài vào khu sạch không tắm", 100, "contained"),
+        # 4 months ago
+        ("FARM-S03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Vi phạm quy trình xử lý xác - chở ra ngoài", 125, "contained"),
+        ("FARM-N01", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Người bán hàng rong vào khu vực cổng trại", 130, "contained"),
+        # 5 months ago
+        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Thức ăn thừa từ nhà bếp đổ sát khu chăn nuôi", 155, "contained"),
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe máy nhân viên vào khu bẩn không rửa", 160, "contained"),
     ]
-    for farm_code, area_suffix, def_code, detector, summary in EVENTS:
+    for farm_code, area_suffix, def_code, detector, summary, days_ago, status in EVENTS:
         farm = farms.get(farm_code)
         area = areas.get((farm_code, area_suffix))
         defn = defs.get(def_code)
@@ -390,9 +513,9 @@ async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users:
         event = KillerMetricEvent(
             farm_id=farm.id, area_id=area.id if area else None,
             definition_id=defn.id,
-            event_at=NOW - timedelta(days=7, hours=len(events) * 3),
+            event_at=NOW - timedelta(days=days_ago),
             detected_by_user_id=users[detector].id,
-            source_type="manual", summary=summary, status="open",
+            source_type="manual", summary=summary, status=status,
         )
         db.add(event)
         events.append(event)
@@ -481,6 +604,8 @@ TASK_DATA = [
     ("TASK-2026-006", "RC-2026-004", "Lắp đặt barrier tự động cổng vào", "corrective", "P1", "closed", "farm_mgr"),
     ("TASK-2026-007", "RC-2026-005", "Nâng cấp hạ tầng sát trùng khu đệm", "corrective", "P2", "open", "farm_mgr"),
     ("TASK-2026-008", "RC-2026-006", "Kiểm tra chéo tự đánh giá và audit", "preventive", "P1", "in_progress", "auditor"),
+    ("TASK-2026-009", "RC-2026-003", "Mua thiết bị tiêu hủy xác heo", "corrective", "P1", "open", "farm_mgr"),
+    ("TASK-2026-010", "RC-2026-001", "Huấn luyện nhân viên về ATSH thức ăn", "preventive", "P2", "open", "farm_mgr"),
 ]
 
 
@@ -494,12 +619,24 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
 
         # Insert closed tasks as 'open' first (DB trigger requires review before close)
         insert_status = "open" if status == "closed" else status
+        # Some tasks are overdue — SLA due date in the past
+        is_overdue = task_no in ("TASK-2026-005", "TASK-2026-007", "TASK-2026-009", "TASK-2026-010")
+        if is_overdue:
+            sla = NOW - timedelta(days=5)
+            completion = NOW - timedelta(days=2)
+        elif priority == "P0":
+            sla = NOW + timedelta(days=3)
+            completion = NOW + timedelta(days=7)
+        else:
+            sla = NOW + timedelta(days=7)
+            completion = NOW + timedelta(days=14)
+
         task = CorrectiveTask(
             case_id=case.id, task_no=task_no, title=title,
             description=f"Nhiệm vụ khắc phục: {title}. Yêu cầu hoàn thành theo SLA.",
             task_type=t_type, priority=priority, status=insert_status,
-            sla_due_at=NOW + timedelta(days=3) if priority == "P0" else NOW + timedelta(days=7),
-            completion_due_at=NOW + timedelta(days=7) if priority == "P0" else NOW + timedelta(days=14),
+            sla_due_at=sla,
+            completion_due_at=completion,
             completion_criteria="Hoàn thành và có bằng chứng xác nhận",
             evidence_requirement="Ảnh chụp hiện trường trước/sau xử lý",
             created_by_user_id=users["expert"].id,
@@ -562,12 +699,16 @@ FLOORPLAN_DATA = [
 ]
 
 MARKER_TEMPLATES = [
-    ("gate", "Cổng chính", 5.0, 50.0),
-    ("disinfection", "Trạm sát trùng", 15.0, 50.0),
-    ("feed_storage", "Kho cám", 30.0, 20.0),
-    ("quarantine", "Khu cách ly", 80.0, 15.0),
-    ("dead_pig_zone", "Khu xử lý heo chết", 90.0, 80.0),
-    ("checkpoint", "Trạm kiểm soát nội bộ", 50.0, 50.0),
+    # (marker_type, label, x_percent, y_percent, area_suffix_to_link)
+    ("gate", "Cổng chính", 5.0, 50.0, "GATE"),
+    ("disinfection", "Nhà tắm sát trùng", 15.0, 50.0, "SHOWER"),
+    ("feed_storage", "Kho cám", 30.0, 20.0, "FEED_STORE"),
+    ("quarantine", "Khu cách ly", 80.0, 15.0, "QUARANTINE"),
+    ("dead_pig_zone", "Khu xử lý heo chết", 90.0, 80.0, "DEAD_PIG"),
+    ("checkpoint", "Khu đệm", 40.0, 50.0, "BUFFER"),
+    ("checkpoint", "Khu sạch", 65.0, 50.0, "CLEAN"),
+    ("checkpoint", "Khu bẩn", 20.0, 80.0, "DIRTY"),
+    ("checkpoint", "Văn phòng", 10.0, 20.0, "OFFICE"),
 ]
 
 
@@ -586,17 +727,19 @@ async def _seed_floorplans(db: AsyncSession, farms: dict, areas: dict, users: di
         floorplans[farm_code] = fp
     await db.flush()
 
+    marker_count = 0
     for farm_code, fp in floorplans.items():
-        for m_type, m_label, x, y in MARKER_TEMPLATES:
-            area = areas.get((farm_code, "CLEAN")) if m_type in ("quarantine",) else None
+        for m_type, m_label, x, y, area_suffix in MARKER_TEMPLATES:
+            area = areas.get((farm_code, area_suffix))
             db.add(FloorplanMarker(
                 floorplan_version_id=fp.id,
                 area_id=area.id if area else None,
                 marker_type=m_type, label=m_label,
                 x_percent=x, y_percent=y,
             ))
+            marker_count += 1
     await db.flush()
-    print(f"  Created {len(floorplans)} floorplans with {len(floorplans) * len(MARKER_TEMPLATES)} markers")
+    print(f"  Created {len(floorplans)} floorplans with {marker_count} markers")
     return floorplans
 
 

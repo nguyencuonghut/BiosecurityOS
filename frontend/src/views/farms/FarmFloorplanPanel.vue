@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -8,10 +8,13 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import DatePicker from 'primevue/datepicker'
 import Tag from 'primevue/tag'
+import Select from 'primevue/select'
 import ProgressBar from 'primevue/progressbar'
 import { useAuthStore } from '@/stores/auth.js'
+import { useFarmStore } from '@/stores/farm.js'
 import * as floorplanService from '@/services/floorplanService.js'
 import * as attachmentService from '@/services/attachmentService.js'
+import FloorplanCanvas from '@/components/scars/FloorplanCanvas.vue'
 
 const props = defineProps({
   farmId: { type: String, required: true },
@@ -19,6 +22,7 @@ const props = defineProps({
 
 const toast = useToast()
 const authStore = useAuthStore()
+const farmStore = useFarmStore()
 
 const floorplans = ref([])
 const loading = ref(false)
@@ -27,18 +31,51 @@ const creating = ref(false)
 const uploadProgress = ref(0)
 const selectedFile = ref(null)
 const fileInputRef = ref(null)
-// Preview images keyed by floorplan id
 const previewUrls = ref({})
 
+// Canvas state
+const activeFloorplanId = ref(null)
+const canvasMarkers = ref([])
+const canvasImageUrl = ref(null)
+const showPlaceDialog = ref(false)
+const placingCoords = ref(null)
+const placeForm = ref({ area_id: null })
+
 const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
-const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_SIZE = 50 * 1024 * 1024
 
 const form = ref({
   title: '',
   effective_from: null,
 })
 
-onMounted(() => fetchFloorplans())
+// Active floorplan (status = active)
+const activeFloorplan = computed(() => floorplans.value.find(fp => fp.status === 'active'))
+
+// Areas not yet placed on the active floorplan (available for placement)
+const unplacedAreas = computed(() => {
+  const placedAreaIds = new Set(canvasMarkers.value.filter(m => m.area_id).map(m => m.area_id))
+  return farmStore.areas.filter(a => a.is_active && !placedAreaIds.has(a.id))
+})
+
+const areaTypeLabels = {
+  gate: 'Cổng',
+  barn: 'Chuồng',
+  storage: 'Kho',
+  office: 'Văn phòng',
+  yard: 'Sân',
+  buffer_zone: 'Vùng đệm',
+  shower: 'Nhà tắm',
+  quarantine: 'Cách ly',
+  other: 'Khác',
+}
+
+onMounted(async () => {
+  await fetchFloorplans()
+  // Ensure areas and routes are loaded
+  if (!farmStore.areas.length) await farmStore.fetchAreas(props.farmId)
+  if (!farmStore.routes.length) await farmStore.fetchRoutes(props.farmId)
+})
 
 async function fetchFloorplans() {
   loading.value = true
@@ -49,6 +86,11 @@ async function fetchFloorplans() {
       if (fp.plan_file_attachment_id && !previewUrls.value[fp.id]) {
         loadPreview(fp)
       }
+    }
+    // Auto-load active floorplan canvas
+    const active = activeFloorplan.value
+    if (active) {
+      await loadCanvasData(active)
     }
   } finally {
     loading.value = false
@@ -143,10 +185,127 @@ function formatDate(val) {
   if (!val) return '—'
   return new Date(val).toLocaleDateString('vi-VN')
 }
+
+// ── Canvas: load floorplan markers + image ────────────────────
+async function loadCanvasData(fp) {
+  activeFloorplanId.value = fp.id
+  try {
+    const markers = await floorplanService.listMarkers(fp.id)
+    canvasMarkers.value = markers
+  } catch {
+    canvasMarkers.value = []
+  }
+  // Load image
+  if (fp.plan_file_attachment_id) {
+    try {
+      const result = await attachmentService.getViewUrl(fp.plan_file_attachment_id)
+      canvasImageUrl.value = result.view_url
+    } catch {
+      canvasImageUrl.value = null
+    }
+  } else {
+    canvasImageUrl.value = null
+  }
+}
+
+// Click on canvas → open dialog to place an area marker
+function onCanvasClick(coords) {
+  if (!unplacedAreas.value.length) {
+    toast.add({ severity: 'info', summary: 'Thông tin', detail: 'Tất cả khu vực đã được đặt trên sơ đồ', life: 3000 })
+    return
+  }
+  placingCoords.value = coords
+  placeForm.value = { area_id: null }
+  showPlaceDialog.value = true
+}
+
+// Submit: create marker for an area
+async function submitPlaceMarker() {
+  if (!placeForm.value.area_id || !placingCoords.value) return
+  const area = farmStore.areas.find(a => a.id === placeForm.value.area_id)
+  if (!area) return
+  try {
+    await floorplanService.createMarker(activeFloorplanId.value, {
+      area_id: area.id,
+      marker_type: area.area_type || 'other',
+      label: area.name,
+      x_percent: placingCoords.value.x_percent,
+      y_percent: placingCoords.value.y_percent,
+    })
+    showPlaceDialog.value = false
+    toast.add({ severity: 'success', summary: 'Đã đặt', detail: `${area.name} đã được gắn lên sơ đồ`, life: 3000 })
+    // Reload markers
+    const markers = await floorplanService.listMarkers(activeFloorplanId.value)
+    canvasMarkers.value = markers
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: err.response?.data?.message || 'Không thể đặt marker', life: 4000 })
+  }
+}
+
+// Delete a marker (click on marker → confirm remove)
+async function onMarkerClick(marker) {
+  if (!authStore.hasPermission('SCAR_WRITE')) return
+  if (!confirm(`Bỏ "${marker.label}" khỏi sơ đồ?`)) return
+  try {
+    await floorplanService.deleteMarker(activeFloorplanId.value, marker.id)
+    canvasMarkers.value = canvasMarkers.value.filter(m => m.id !== marker.id)
+    toast.add({ severity: 'info', summary: 'Đã gỡ', detail: `${marker.label} đã được gỡ khỏi sơ đồ`, life: 3000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể gỡ marker', life: 4000 })
+  }
+}
+
+// Drag marker to new position
+async function onMarkerDragEnd({ id, x_percent, y_percent }) {
+  if (!activeFloorplanId.value) return
+  try {
+    await floorplanService.updateMarker(activeFloorplanId.value, id, { x_percent, y_percent })
+    const idx = canvasMarkers.value.findIndex(m => m.id === id)
+    if (idx !== -1) {
+      canvasMarkers.value[idx] = { ...canvasMarkers.value[idx], x_percent, y_percent }
+    }
+    toast.add({ severity: 'success', summary: 'Đã di chuyển', detail: 'Vị trí marker đã được cập nhật', life: 2000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể cập nhật vị trí marker', life: 4000 })
+    // Reload to revert
+    const markers = await floorplanService.listMarkers(activeFloorplanId.value)
+    canvasMarkers.value = markers
+  }
+}
+
+function areaOptionLabel(area) {
+  const typeLabel = areaTypeLabels[area.area_type] || area.area_type
+  return `${area.name} (${typeLabel})`
+}
 </script>
 
 <template>
   <div class="floorplan-panel">
+    <!-- Interactive Canvas for Active Floorplan -->
+    <div v-if="activeFloorplan" class="canvas-section">
+      <div class="panel-toolbar">
+        <h3>
+          <i class="pi pi-map" /> Sơ đồ mặt bằng — {{ activeFloorplan.title }}
+          <Tag :value="'v' + activeFloorplan.version_no" severity="info" rounded />
+        </h3>
+        <div class="toolbar-actions">
+          <span v-if="unplacedAreas.length" class="unplaced-hint">
+            <i class="pi pi-info-circle" /> Click vào sơ đồ để đặt khu vực ({{ unplacedAreas.length }} chưa đặt)
+          </span>
+        </div>
+      </div>
+      <FloorplanCanvas
+        :markers="canvasMarkers"
+        :routes="farmStore.routes"
+        :imageUrl="canvasImageUrl"
+        :readonly="!authStore.hasPermission('SCAR_WRITE')"
+        @canvasClick="onCanvasClick"
+        @markerClick="onMarkerClick"
+        @markerDragEnd="onMarkerDragEnd"
+      />
+    </div>
+
+    <!-- Floorplan Versions Table -->
     <div class="panel-toolbar">
       <h3>Danh sách Floorplan</h3>
       <Button
@@ -240,10 +399,65 @@ function formatDate(val) {
         <Button label="Tạo" icon="pi pi-check" :loading="creating" @click="submitCreate" :disabled="!form.title || !form.effective_from" />
       </template>
     </Dialog>
+
+    <!-- Place area marker dialog -->
+    <Dialog v-model:visible="showPlaceDialog" header="Đặt khu vực lên sơ đồ" modal :style="{ width: '28rem' }">
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Chọn khu vực *</label>
+          <Select
+            v-model="placeForm.area_id"
+            :options="unplacedAreas"
+            optionValue="id"
+            :optionLabel="areaOptionLabel"
+            placeholder="Chọn khu vực..."
+            class="w-full"
+            filter
+          />
+        </div>
+        <div v-if="placingCoords" class="coords-preview">
+          <i class="pi pi-map-marker" />
+          Vị trí: {{ placingCoords.x_percent.toFixed(1) }}%, {{ placingCoords.y_percent.toFixed(1) }}%
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" text @click="showPlaceDialog = false" />
+        <Button label="Đặt" icon="pi pi-map-marker" @click="submitPlaceMarker" :disabled="!placeForm.area_id" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
 <style scoped>
+.canvas-section {
+  margin-bottom: 2rem;
+  padding: 1.25rem;
+  background: var(--p-surface-card);
+  border: 1px solid var(--p-surface-border);
+  border-radius: 12px;
+}
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.unplaced-hint {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.coords-preview {
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--p-surface-100);
+  border-radius: 6px;
+}
 .panel-toolbar {
   display: flex;
   justify-content: space-between;
