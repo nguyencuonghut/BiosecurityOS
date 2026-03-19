@@ -19,8 +19,11 @@ from app.auth.models import Farm, Region
 from app.cases.models import RiskCase
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
 from app.scars.models import ScarRecord
+from app.shared.cache import cache_get, cache_set
 from app.tasks.models import CorrectiveTask
 from app.trust_scores.models import TrustScoreSnapshot
+
+_DASHBOARD_TTL = 300  # 5 minutes
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -29,6 +32,11 @@ from app.trust_scores.models import TrustScoreSnapshot
 
 async def executive_summary(db: AsyncSession) -> dict:
     """System-wide KPIs for executive dashboard."""
+    cache_key = "dashboard:executive_summary"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     now = datetime.now(timezone.utc)
 
     # Farm count (active)
@@ -104,7 +112,7 @@ async def executive_summary(db: AsyncSession) -> dict:
     # Trust distribution buckets
     trust_distribution = await _trust_distribution(db, latest_trust)
 
-    return {
+    result = {
         "farm_count": farm_count,
         "avg_score": float(avg_score_result) if avg_score_result else None,
         "high_risk_farms": high_risk_farms,
@@ -114,6 +122,8 @@ async def executive_summary(db: AsyncSession) -> dict:
         "low_trust_sites": low_trust_sites,
         "trust_distribution": trust_distribution,
     }
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
+    return result
 
 
 async def _trust_distribution(db: AsyncSession, latest_trust_subq) -> dict:
@@ -147,6 +157,11 @@ async def farm_dashboard(db: AsyncSession, farm_id) -> dict:
     """Farm-specific KPIs: scores over time, open cases/tasks, scars, trust trend."""
     import uuid
     fid = uuid.UUID(str(farm_id))
+
+    cache_key = f"dashboard:farm:{fid}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     # Assessment scores over time (last 12 months, submitted only)
     twelve_months_ago = date.today() - timedelta(days=365)
@@ -241,7 +256,7 @@ async def farm_dashboard(db: AsyncSession, farm_id) -> dict:
         .where(KillerMetricEvent.status == "open")
     )).scalar_one()
 
-    return {
+    result = {
         "farm_id": str(fid),
         "scores_over_time": scores_over_time,
         "open_cases": open_cases,
@@ -251,6 +266,8 @@ async def farm_dashboard(db: AsyncSession, farm_id) -> dict:
         "killer_metric_open": km_open,
         "trust_trend": trust_trend,
     }
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -265,6 +282,11 @@ async def benchmark(
 ) -> list[dict]:
     """Farm comparison: latest score, rank, percentile."""
     import uuid
+
+    cache_key = f"dashboard:benchmark:{farm_type or 'all'}:{region_id or 'all'}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     # Use PostgreSQL DISTINCT ON to get one assessment per farm (the latest).
     latest_score = (
@@ -317,6 +339,7 @@ async def benchmark(
             "rank": rank,
             "percentile": round((total - rank) / total * 100, 1) if total > 0 else 0,
         })
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
     return result
 
 
@@ -326,6 +349,11 @@ async def benchmark(
 
 async def trust_gaps(db: AsyncSession) -> list[dict]:
     """Farms sorted by trust score, highlight low trust (<60)."""
+    cache_key = "dashboard:trust_gaps"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     latest_trust = (
         select(
             TrustScoreSnapshot.farm_id,
@@ -360,7 +388,7 @@ async def trust_gaps(db: AsyncSession) -> list[dict]:
         .order_by(TrustScoreSnapshot.trust_score.asc())
     )).all()
 
-    return [
+    result = [
         {
             "farm_id": str(r.farm_id),
             "farm_name": r.farm_name,
@@ -374,6 +402,8 @@ async def trust_gaps(db: AsyncSession) -> list[dict]:
         }
         for r in rows
     ]
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -388,6 +418,11 @@ async def killer_metrics_trend(
 ) -> list[dict]:
     """Timeline of killer metric events by month, type, status."""
     import uuid
+
+    cache_key = f"dashboard:km_trend:{farm_id or 'all'}:{months}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     cutoff = date.today() - timedelta(days=months * 30)
 
@@ -420,7 +455,7 @@ async def killer_metrics_trend(
 
     rows = (await db.execute(query)).all()
 
-    return [
+    result = [
         {
             "month": r.month.strftime("%Y-%m") if r.month else None,
             "metric_name": r.metric_name,
@@ -430,6 +465,8 @@ async def killer_metrics_trend(
         }
         for r in rows
     ]
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -443,6 +480,11 @@ async def scar_hotspots(
 ) -> list[dict]:
     """Aggregated scar count by farm, scar_type, recurrence."""
     import uuid
+
+    cache_key = f"dashboard:scar_hotspots:{farm_id or 'all'}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     query = (
         select(
@@ -469,7 +511,7 @@ async def scar_hotspots(
 
     rows = (await db.execute(query)).all()
 
-    return [
+    result = [
         {
             "farm_id": str(r.farm_id),
             "farm_name": r.farm_name,
@@ -481,3 +523,5 @@ async def scar_hotspots(
         }
         for r in rows
     ]
+    await cache_set(cache_key, result, _DASHBOARD_TTL)
+    return result

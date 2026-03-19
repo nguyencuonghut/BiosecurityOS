@@ -201,14 +201,4 @@ onBeforeUnmount(() => {
   background: var(--p-text-muted-color);
 }
 
-@media screen and (max-width: 991px) {
-  .layout-sidebar {
-    transform: translateX(-100%);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .layout-mobile-active .layout-sidebar {
-    transform: translateX(0);
-  }
-}
 </style>

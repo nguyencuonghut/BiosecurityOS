@@ -27,6 +27,8 @@ def create_access_token(user_id: uuid.UUID, permissions: list[str]) -> tuple[str
         "exp": expires,
         "iat": datetime.now(UTC),
         "jti": secrets.token_hex(16),
+        "iss": "biosecurity-os",
+        "aud": "biosecurity-os-api",
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return token, expires
@@ -34,7 +36,13 @@ def create_access_token(user_id: uuid.UUID, permissions: list[str]) -> tuple[str
 
 def decode_access_token(token: str) -> dict | None:
     try:
-        return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            issuer="biosecurity-os",
+            audience="biosecurity-os-api",
+        )
     except JWTError:
         return None
 

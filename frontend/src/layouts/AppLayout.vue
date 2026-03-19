@@ -1,11 +1,14 @@
 <script setup>
 import { useLayout } from '@/layouts/composables/layout'
+import { useOfflineQueue } from '@/composables/useOfflineQueue'
 import AppFooter from '@/layouts/AppFooter.vue'
 import AppSidebar from '@/layouts/AppSidebar.vue'
 import AppTopbar from '@/layouts/AppTopbar.vue'
 import Toast from 'primevue/toast'
+import Tag from 'primevue/tag'
 
 const { layoutState, containerClass, hideMobileMenu } = useLayout()
+const { isOnline } = useOfflineQueue()
 </script>
 
 <template>
@@ -13,6 +16,13 @@ const { layoutState, containerClass, hideMobileMenu } = useLayout()
     <AppTopbar />
     <AppSidebar />
     <div class="layout-main-container">
+      <Tag
+        v-if="!isOnline"
+        value="Ngoại tuyến — Dữ liệu sẽ được đồng bộ khi có mạng"
+        severity="warn"
+        icon="pi pi-wifi"
+        class="offline-banner"
+      />
       <div class="layout-main">
         <router-view />
       </div>
@@ -58,7 +68,7 @@ const { layoutState, containerClass, hideMobileMenu } = useLayout()
   width: 100%;
   top: 0;
   left: 0;
-  background-color: var(--p-surface-overlay);
+  background-color: rgba(0, 0, 0, 0.4);
   z-index: 998;
   display: none;
 }
@@ -101,14 +111,17 @@ const { layoutState, containerClass, hideMobileMenu } = useLayout()
   display: block;
 }
 
+.offline-banner {
+  width: 100%;
+  border-radius: 0;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
 /* Mobile responsive */
 @media screen and (max-width: 991px) {
   .layout-main-container {
     margin-left: 0;
-  }
-
-  .layout-mobile-active .layout-main-container {
-    margin-left: 280px;
   }
 }
 

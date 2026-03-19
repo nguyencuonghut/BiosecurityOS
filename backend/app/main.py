@@ -13,7 +13,8 @@ from app.shared.exceptions import (
     app_exception_handler,
     validation_exception_handler,
 )
-from app.shared.middleware import audit_log_middleware, request_id_middleware
+from app.shared.middleware import audit_log_middleware, request_id_middleware, security_headers_middleware
+from app.shared.rate_limiter import rate_limit_middleware
 
 
 @asynccontextmanager
@@ -24,7 +25,9 @@ async def lifespan(app: FastAPI):
     yield
     # ── Shutdown ──
     from app.database import engine
+    from app.shared.cache import close_redis
 
+    await close_redis()
     await engine.dispose()
 
 
@@ -41,10 +44,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"] if settings.is_development else [],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+app.middleware("http")(security_headers_middleware)
 app.middleware("http")(audit_log_middleware)
+app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(request_id_middleware)
 
 # ── Exception handlers ──

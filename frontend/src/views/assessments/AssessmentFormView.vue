@@ -725,6 +725,115 @@ function goPrevSection() {
 
 .loading-container { display: flex; justify-content: center; padding: 4rem; }
 
+/* ── Mobile Responsive ── */
+@media (max-width: 768px) {
+  .header-card {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  .form-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .header-right {
+    border-left: none;
+    margin-left: 0;
+    padding: 0.5rem 0 0;
+    border-top: 1px solid var(--p-surface-border);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: left;
+  }
+  .overall-score {
+    font-size: 2rem;
+  }
+  .header-left h2 {
+    font-size: 1.05rem;
+  }
+  .header-meta {
+    font-size: 0.75rem;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .section-nav {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .nav-title {
+    grid-column: 1 / -1;
+    padding: 0 0.25rem;
+  }
+  .nav-section-item {
+    padding: 0.5rem 0.625rem;
+    border-radius: 8px;
+  }
+  .nav-section-name {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.375rem;
+  }
+  .nav-section-name .p-tag {
+    font-size: 0.65rem;
+    padding: 0.125rem 0.375rem;
+  }
+  .nav-progress-row {
+    gap: 0.375rem;
+  }
+  .nav-pct {
+    font-size: 0.65rem;
+    min-width: auto;
+  }
+
+  .item-card {
+    padding: 1rem;
+  }
+  .item-inputs {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .input-group {
+    width: 100%;
+  }
+
+  .bottom-summary {
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+  }
+  .summary-item {
+    min-width: calc(50% - 0.5rem);
+  }
+
+  .assessment-actions {
+    flex-wrap: wrap;
+  }
+  .form-actions {
+    flex-direction: column;
+  }
+  .form-actions .p-button {
+    width: 100%;
+  }
+
+  .low-scoring-section {
+    padding: 1rem;
+    overflow-x: auto;
+  }
+
+  .spider-section {
+    padding: 1rem;
+  }
+}
+
 /* ── Trust Score Bar ── */
 .trust-score-bar {
   margin-top: 1rem;
