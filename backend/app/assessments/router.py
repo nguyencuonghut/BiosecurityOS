@@ -51,7 +51,11 @@ async def list_assessments(
         page=pagination.page,
         page_size=pagination.page_size,
     )
-    items_out = [AssessmentOut.model_validate(a).model_dump(mode="json") for a in items]
+    items_out = []
+    for a in items:
+        d = AssessmentOut.model_validate(a).model_dump(mode="json")
+        d["farm_name"] = a.farm.name if a.farm else None
+        items_out.append(d)
     return paginated_response(request, items_out, total, pagination)
 
 

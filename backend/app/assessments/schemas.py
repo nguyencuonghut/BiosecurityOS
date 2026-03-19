@@ -81,6 +81,7 @@ class AssessmentOut(BaseModel):
 
     id: uuid.UUID
     farm_id: uuid.UUID
+    farm_name: str | None = None
     template_id: uuid.UUID
     assessment_type: str
     assessment_date: datetime

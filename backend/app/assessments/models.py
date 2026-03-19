@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.auth.models import Farm
 from app.models_base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
@@ -53,6 +54,7 @@ class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     # Relationships
+    farm: Mapped["Farm"] = relationship(lazy="joined", viewonly=True)
     item_results: Mapped[list["AssessmentItemResult"]] = relationship(
         back_populates="assessment", cascade="all, delete-orphan"
     )

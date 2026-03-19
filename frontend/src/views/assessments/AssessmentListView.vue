@@ -110,6 +110,16 @@ function openDetail(row) {
 
     <div class="filter-bar">
       <Select
+        v-model="store.filters.farm_id"
+        :options="farmStore.farms"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="Trại"
+        showClear
+        filter
+        @change="onFilterChange"
+      />
+      <Select
         v-model="store.filters.assessment_type"
         :options="typeOptions"
         optionLabel="label"
@@ -143,7 +153,10 @@ function openDetail(row) {
       <Column header="Ngày" style="width: 10%">
         <template #body="{ data }">{{ formatDate(data.assessment_date) }}</template>
       </Column>
-      <Column field="assessment_type" header="Loại" style="width: 14%">
+      <Column header="Trại" style="width: 14%">
+        <template #body="{ data }">{{ data.farm_name || '—' }}</template>
+      </Column>
+      <Column field="assessment_type" header="Loại" style="width: 12%">
         <template #body="{ data }">{{ typeName(data.assessment_type) }}</template>
       </Column>
       <Column field="performed_by_name_snapshot" header="Người đánh giá" style="width: 16%" />
