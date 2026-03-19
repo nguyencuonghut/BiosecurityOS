@@ -1,11 +1,18 @@
 import { computed, reactive } from 'vue'
 
+const savedDark = localStorage.getItem('biosecurity-dark-mode') === 'true'
+
 const layoutState = reactive({
   sidebarVisible: true,
   mobileMenuActive: false,
   staticMenuInactive: false,
-  darkMode: false,
+  darkMode: savedDark,
 })
+
+// Apply on initial load
+if (savedDark) {
+  document.documentElement.classList.add('app-dark')
+}
 
 export function useLayout() {
   const toggleSidebar = () => {
@@ -27,6 +34,7 @@ export function useLayout() {
     } else {
       document.documentElement.classList.remove('app-dark')
     }
+    localStorage.setItem('biosecurity-dark-mode', layoutState.darkMode)
   }
 
   const isDesktop = () => window.innerWidth > 991

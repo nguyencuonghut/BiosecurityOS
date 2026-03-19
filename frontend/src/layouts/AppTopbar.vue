@@ -9,7 +9,7 @@ import Badge from 'primevue/badge'
 import Popover from 'primevue/popover'
 
 const router = useRouter()
-const { toggleSidebar } = useLayout()
+const { toggleSidebar, toggleDarkMode, layoutState } = useLayout()
 const authStore = useAuthStore()
 const notifStore = useNotificationStore()
 const notifPopover = ref()
@@ -77,6 +77,14 @@ function timeAgo(iso) {
     </div>
 
     <div class="topbar-right">
+      <Button
+        :icon="layoutState.darkMode ? 'pi pi-sun' : 'pi pi-moon'"
+        text
+        rounded
+        severity="secondary"
+        :aria-label="layoutState.darkMode ? 'Light mode' : 'Dark mode'"
+        @click="toggleDarkMode"
+      />
       <div class="notif-bell-wrapper">
         <Button
           icon="pi pi-bell"
