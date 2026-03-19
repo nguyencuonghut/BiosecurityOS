@@ -19,6 +19,7 @@ const props = defineProps({
   markers: { type: Array, default: () => [] },
   scars: { type: Array, default: () => [] },
   readonly: { type: Boolean, default: true },
+  imageUrl: { type: String, default: null },
 })
 
 const emit = defineEmits(['markerClick', 'scarClick', 'canvasClick'])
@@ -85,10 +86,18 @@ const legendItems = computed(() =>
 
 <template>
   <div class="floorplan-canvas">
-    <!-- Canvas area with grey background acting as a schematic grid -->
+    <!-- Canvas area -->
     <div class="canvas-area" @click="onCanvasClick">
-      <!-- Grid pattern background -->
-      <svg class="grid-bg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+      <!-- Floorplan image background -->
+      <img
+        v-if="imageUrl"
+        :src="imageUrl"
+        class="floorplan-image"
+        alt="Floorplan"
+        draggable="false"
+      />
+      <!-- Grid pattern background (fallback when no image) -->
+      <svg v-else class="grid-bg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
             <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--p-surface-300)" stroke-width="0.5" />
@@ -169,6 +178,15 @@ const legendItems = computed(() =>
   border-radius: var(--p-border-radius);
   overflow: hidden;
   cursor: default;
+}
+.floorplan-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 .grid-bg {
   position: absolute;

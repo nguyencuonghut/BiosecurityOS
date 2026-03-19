@@ -14,12 +14,14 @@ import ScarDetailDrawer from '@/components/scars/ScarDetailDrawer.vue'
 import ScarFormDialog from '@/components/scars/ScarFormDialog.vue'
 import * as scarService from '@/services/scarService.js'
 import * as farmService from '@/services/farmService.js'
+import * as attachmentService from '@/services/attachmentService.js'
 
 const toast = useToast()
 
 // ── Data ──────────────────────────────────────────────────────
 const farms = ref([])
 const scarMapData = ref({ floorplan: null, markers: [], scars: [] })
+const floorplanImageUrl = ref(null)
 const scarList = ref([])
 const scarListTotal = ref(0)
 const loading = ref(false)
@@ -69,6 +71,8 @@ const selectedScarId = ref(null)
 // ── Create/Edit dialog ───────────────────────────────────────────
 const formDialogVisible = ref(false)
 const editingScar = ref(null)
+const clickedX = ref(null)
+const clickedY = ref(null)
 // ── Lifecycle ─────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -100,6 +104,17 @@ async function loadScarMap() {
     if (filterDateRange.value?.[1]) params.date_to = formatDateISO(filterDateRange.value[1])
 
     scarMapData.value = await scarService.getScarMap(selectedFarmId.value, params)
+
+    // Load floorplan image if available
+    floorplanImageUrl.value = null
+    if (scarMapData.value.floorplan?.plan_file_attachment_id) {
+      try {
+        const result = await attachmentService.getViewUrl(scarMapData.value.floorplan.plan_file_attachment_id)
+        floorplanImageUrl.value = result.view_url
+      } catch {
+        // no image available
+      }
+    }
   } catch {
     toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải scar map', life: 3000 })
   } finally {
@@ -142,6 +157,15 @@ function onScarUpdated() {
 
 function openCreateDialog() {
   editingScar.value = null
+  clickedX.value = null
+  clickedY.value = null
+  formDialogVisible.value = true
+}
+
+function onCanvasClickToCreate(coords) {
+  editingScar.value = null
+  clickedX.value = coords.x_percent
+  clickedY.value = coords.y_percent
   formDialogVisible.value = true
 }
 
@@ -255,8 +279,10 @@ function selectedFarmName() {
         <FloorplanCanvas
           :markers="scarMapData.markers || []"
           :scars="scarMapData.scars || []"
-          :readonly="true"
+          :imageUrl="floorplanImageUrl"
+          :readonly="false"
           @scarClick="onScarClick"
+          @canvasClick="onCanvasClickToCreate"
         />
       </div>
 
@@ -320,6 +346,9 @@ function selectedFarmName() {
       :scar="editingScar"
       :farmId="selectedFarmId"
       :farms="farms"
+      :initialX="clickedX"
+      :initialY="clickedY"
+      :floorplanImageUrl="floorplanImageUrl"
       @saved="onScarSaved"
     />
   </div>
