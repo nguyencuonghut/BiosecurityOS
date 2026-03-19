@@ -389,7 +389,7 @@ const markerLegendItems = computed(() => {
   background: var(--p-surface-100);
   border: 1px solid var(--p-surface-300);
   border-radius: var(--p-border-radius);
-  overflow: hidden;
+  overflow: visible;
   cursor: default;
 }
 .floorplan-image {
@@ -400,6 +400,7 @@ const markerLegendItems = computed(() => {
   object-fit: contain;
   pointer-events: none;
   user-select: none;
+  border-radius: inherit;
 }
 .grid-bg {
   position: absolute;
