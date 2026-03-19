@@ -99,18 +99,28 @@ function displayY(m) {
   return m.y_percent
 }
 
-// ── Marker icon mapping ───────────────────────────────────────
-const markerIcons = {
-  gate: 'pi-sign-in',
-  disinfection: 'pi-sparkles',
-  feed_storage: 'pi-box',
-  quarantine: 'pi-shield',
-  dead_pig_zone: 'pi-times-circle',
-  checkpoint: 'pi-verified',
+// ── Marker icon & color mapping (biosecurity context) ─────────
+// Keys = area_type from DB: gate, production, buffer, logistics,
+//         office, quarantine, buffer_zone, storage, yard
+// Uses MDI (Material Design Icons) for industry-specific icons
+const markerConfig = {
+  gate:        { icon: 'mdi-gate',                    color: '#64748b', label: 'Cổng' },
+  production:  { icon: 'mdi-pig-variant-outline',     color: '#22c55e', label: 'Khu sạch' },
+  buffer:      { icon: 'mdi-shield-half-full',        color: '#f59e0b', label: 'Khu đệm' },
+  logistics:   { icon: 'mdi-virus',                   color: '#ef4444', label: 'Khu bẩn' },
+  office:      { icon: 'mdi-office-building-outline', color: '#6366f1', label: 'Văn phòng' },
+  quarantine:  { icon: 'mdi-shield-alert-outline',    color: '#dc2626', label: 'Cách ly' },
+  buffer_zone: { icon: 'mdi-shower-head',             color: '#0ea5e9', label: 'Sát trùng' },
+  storage:     { icon: 'mdi-warehouse',               color: '#a855f7', label: 'Kho cám' },
+  yard:        { icon: 'mdi-skull-outline',           color: '#78716c', label: 'Xử lý xác' },
 }
 
 function getMarkerIcon(type) {
-  return markerIcons[type] || 'pi-map-marker'
+  return markerConfig[type]?.icon || 'mdi-map-marker'
+}
+
+function getMarkerColor(type) {
+  return markerConfig[type]?.color || '#6b7280'
 }
 
 // ── Scar color mapping ────────────────────────────────────────
@@ -205,6 +215,14 @@ const routeLegendItems = computed(() => {
   const types = new Set(props.routes.map(r => r.route_type))
   return [...types].map(t => ({ type: t, color: routeColors[t] || '#6b7280', label: routeTypeLabels[t] || t }))
 })
+
+// Marker legend — only show types present on the canvas
+const markerLegendItems = computed(() => {
+  const types = new Set(props.markers.map(m => m.marker_type))
+  return [...types]
+    .filter(t => markerConfig[t])
+    .map(t => ({ type: t, ...markerConfig[t] }))
+})
 </script>
 
 <template>
@@ -266,17 +284,21 @@ const routeLegendItems = computed(() => {
         :key="'m-' + m.id"
         class="marker-pin"
         :class="{ 'marker-dragging': draggingMarker?.id === m.id, 'marker-draggable': !readonly }"
-        :style="{ left: displayX(m) + '%', top: displayY(m) + '%' }"
+        :style="{
+          left: displayX(m) + '%',
+          top: displayY(m) + '%',
+          '--marker-color': getMarkerColor(m.marker_type),
+        }"
         @click.stop="onMarkerClicked($event, m)"
         @pointerdown="onMarkerPointerDown($event, m)"
         @mouseenter="hoveredMarker = m.id"
         @mouseleave="hoveredMarker = null"
       >
-        <i :class="'pi ' + getMarkerIcon(m.marker_type)" />
+        <i :class="'mdi ' + getMarkerIcon(m.marker_type)" />
         <!-- Tooltip -->
         <div class="marker-tooltip" v-if="hoveredMarker === m.id && !draggingMarker">
           <div class="tooltip-title">{{ m.label }}</div>
-          <div class="tooltip-sub">{{ m.marker_type }}</div>
+          <div class="tooltip-sub">{{ markerConfig[m.marker_type]?.label || m.marker_type }}</div>
           <div v-if="!readonly" class="tooltip-hint">Kéo để di chuyển</div>
         </div>
       </div>
@@ -314,7 +336,13 @@ const routeLegendItems = computed(() => {
         </span>
       </div>
       <div class="legend-section" v-if="markers.length > 0">
-        <span class="legend-title">Markers: {{ markers.length }}</span>
+        <span class="legend-title">Khu vực:</span>
+        <span v-for="item in markerLegendItems" :key="item.type" class="legend-item">
+          <span class="legend-dot" :style="{ background: item.color }">
+            <i :class="'mdi ' + item.icon" style="font-size: 0.5rem; color: #fff;" />
+          </span>
+          {{ item.label }}
+        </span>
       </div>
       <div class="legend-section" v-if="routeLegendItems.length > 0">
         <span class="legend-title">Luồng:</span>
@@ -372,19 +400,20 @@ const routeLegendItems = computed(() => {
 .marker-pin {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--p-primary-color);
-  color: var(--p-primary-contrast-color);
+  background: var(--marker-color, var(--p-primary-color));
+  color: #fff;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   cursor: pointer;
   z-index: 2;
-  transition: transform 0.15s;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,255,255,0.8);
 }
 .marker-pin:hover {
   transform: translate(-50%, -50%) scale(1.2);
@@ -485,10 +514,13 @@ const routeLegendItems = computed(() => {
   gap: 0.3rem;
 }
 .legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .legend-line {
   width: 16px;

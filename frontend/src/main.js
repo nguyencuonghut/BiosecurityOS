@@ -7,6 +7,7 @@ import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import Tooltip from 'primevue/tooltip'
 import 'primeicons/primeicons.css'
+import '@mdi/font/css/materialdesignicons.min.css'
 import '@/styles/mobile.css'
 
 import App from './App.vue'
