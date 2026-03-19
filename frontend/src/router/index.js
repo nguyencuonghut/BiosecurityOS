@@ -113,6 +113,24 @@ const routes = [
         component: () => import('@/views/lessons/LessonLibraryView.vue'),
         meta: { permission: 'LESSON_READ' },
       },
+      {
+        path: 'reports',
+        name: 'Reports',
+        component: () => import('@/views/reports/ReportView.vue'),
+        meta: { permission: 'REPORT_GENERATE' },
+      },
+      {
+        path: 'notifications',
+        name: 'Notifications',
+        component: () => import('@/views/notifications/NotificationListView.vue'),
+        meta: { permission: 'NOTIFICATION_READ' },
+      },
+      {
+        path: 'admin/audit-logs',
+        name: 'AuditLogs',
+        component: () => import('@/views/admin/AuditLogView.vue'),
+        meta: { permission: 'AUDIT_LOG_READ' },
+      },
     ],
   },
   {

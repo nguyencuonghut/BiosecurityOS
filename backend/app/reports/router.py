@@ -12,8 +12,30 @@ from app.database import get_db
 from app.reports import service
 from app.reports.schemas import ReportCreateRequest, ReportOut
 from app.shared.exceptions import success_response
+from app.shared.pagination import PaginationParams, paginated_response
 
 router = APIRouter()
+
+
+@router.get(
+    "",
+    dependencies=[require_permission("REPORT_GENERATE")],
+)
+async def list_reports(
+    request: Request,
+    current_user: CurrentUser,
+    pagination: Annotated[PaginationParams, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """List current user's reports."""
+    rows, total = await service.list_reports(
+        db,
+        requested_by=current_user.id,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+    items = [ReportOut.model_validate(r).model_dump(mode="json") for r in rows]
+    return paginated_response(request, items, total, pagination)
 
 
 @router.post(

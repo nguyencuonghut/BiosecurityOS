@@ -17,6 +17,29 @@ from app.reports.schemas import VALID_REPORT_TYPES
 from app.shared.exceptions import NotFoundException, ValidationException
 
 
+async def list_reports(
+    db: AsyncSession,
+    *,
+    requested_by: uuid.UUID,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[ReportRequest], int]:
+    """List reports for a user, newest first."""
+    from sqlalchemy import func, select
+
+    base = select(ReportRequest).where(ReportRequest.requested_by == requested_by)
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    rows_q = (
+        base.order_by(ReportRequest.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = (await db.execute(rows_q)).scalars().all()
+    return list(rows), total
+
+
 async def create_report(
     db: AsyncSession,
     *,
@@ -79,8 +102,10 @@ async def generate_download(db: AsyncSession, report_id: uuid.UUID) -> tuple[byt
     elif report.format == "xlsx":
         content, content_type = await _to_xlsx(data, report.report_type)
         filename = f"{report.report_type}_{report.id}.xlsx"
+    elif report.format == "pdf":
+        content, content_type = _to_pdf(data, report.report_type)
+        filename = f"{report.report_type}_{report.id}.pdf"
     else:
-        # PDF fallback: generate CSV (Phase 1; WeasyPrint in Phase 2)
         content, content_type = _to_csv(data, report.report_type)
         filename = f"{report.report_type}_{report.id}.csv"
 
@@ -192,6 +217,59 @@ async def _to_xlsx(data: list[dict], report_type: str) -> tuple[bytes, str]:
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _to_pdf(data: list[dict], report_type: str) -> tuple[bytes, str]:
+    """Convert list of dicts to PDF bytes using fpdf2."""
+    from fpdf import FPDF
+
+    _DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    _DEJAVU_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+    flat_data = _flatten_rows(data)
+
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.add_font("DejaVu", "", _DEJAVU)
+    pdf.add_font("DejaVu", "B", _DEJAVU_BOLD)
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Title
+    pdf.set_font("DejaVu", "B", 14)
+    title = report_type.replace("_", " ").title()
+    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(4)
+
+    if not flat_data:
+        pdf.set_font("DejaVu", "", 11)
+        pdf.cell(0, 10, "No data available.", new_x="LMARGIN", new_y="NEXT", align="C")
+        output = io.BytesIO()
+        pdf.output(output)
+        return output.getvalue(), "application/pdf"
+
+    headers = list(flat_data[0].keys())
+    num_cols = len(headers)
+    page_width = pdf.w - pdf.l_margin - pdf.r_margin
+    col_width = page_width / num_cols if num_cols else page_width
+
+    # Header row
+    pdf.set_font("DejaVu", "B", 8)
+    pdf.set_fill_color(220, 220, 220)
+    for h in headers:
+        pdf.cell(col_width, 7, str(h)[:20], border=1, fill=True, align="C")
+    pdf.ln()
+
+    # Data rows
+    pdf.set_font("DejaVu", "", 7)
+    for row in flat_data:
+        for h in headers:
+            val = str(row.get(h, ""))[:25]
+            pdf.cell(col_width, 6, val, border=1)
+        pdf.ln()
+
+    output = io.BytesIO()
+    pdf.output(output)
+    return output.getvalue(), "application/pdf"
 
 
 def _flatten_rows(data: list[dict]) -> list[dict]:
