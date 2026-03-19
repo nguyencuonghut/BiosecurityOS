@@ -385,7 +385,7 @@ async function handleClone() {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-.builder-header h2 { margin: 0; }
+.builder-header h2 { margin: 0; color: var(--p-text-color); }
 .header-actions {
   display: flex;
   align-items: center;
@@ -393,13 +393,15 @@ async function handleClone() {
 }
 .inline { display: inline; margin-left: 0.5rem; }
 .version-tag {
-  background: var(--p-surface-100);
+  background: var(--p-primary-color);
+  color: var(--p-primary-contrast-color);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.8rem;
   font-weight: 600;
 }
 .sections-area { display: flex; flex-direction: column; gap: 0.75rem; }
+.sections-area h3 { color: var(--p-text-color); }
 .section-toolbar {
   display: flex;
   justify-content: space-between;

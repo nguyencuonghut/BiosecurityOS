@@ -515,7 +515,7 @@ function goPrevSection() {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--p-text-muted-color);
+  color: var(--p-text-color);
   padding: 0 0.75rem;
   margin-bottom: 0.25rem;
 }
@@ -543,6 +543,7 @@ function goPrevSection() {
   font-weight: 600;
   font-size: 0.85rem;
   margin-bottom: 0.5rem;
+  color: var(--p-text-color);
 }
 .nav-progress-row {
   display: flex;
@@ -563,7 +564,7 @@ function goPrevSection() {
   flex-direction: column;
   gap: 0.75rem;
 }
-.items-panel h3 { margin: 0 0 0.25rem; font-size: 1.1rem; }
+.items-panel h3 { margin: 0 0 0.25rem; font-size: 1.1rem; color: var(--p-text-color); }
 
 .item-card {
   padding: 1.25rem;
