@@ -544,6 +544,14 @@ CREATE TABLE biosec.task_attachment (
     CONSTRAINT ck_task_attachment_1 CHECK (upload_stage IN ('before','during','after','review'))
 );
 
+-- killer_event_attachment
+CREATE TABLE biosec.killer_event_attachment (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    event_id uuid NOT NULL,
+    attachment_id uuid NOT NULL,
+    caption text
+);
+
 -- task_review
 CREATE TABLE biosec.task_review (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -1036,6 +1044,12 @@ COMMENT ON COLUMN biosec.task_attachment.upload_stage IS $$ Giai đoạn chụp/
 COMMENT ON COLUMN biosec.task_attachment.is_primary_evidence IS $$ Đánh dấu đây là bằng chứng chính để reviewer xem đầu tiên. $$;
 COMMENT ON COLUMN biosec.task_attachment.caption IS $$ Chú thích ngắn cho file. $$;
 
+COMMENT ON TABLE biosec.killer_event_attachment IS $$ Bảng file bằng chứng gắn cho sự kiện killer metric. $$;
+COMMENT ON COLUMN biosec.killer_event_attachment.id IS $$ Khóa chính (PK) của bảng. $$;
+COMMENT ON COLUMN biosec.killer_event_attachment.event_id IS $$ Sự kiện killer metric mà file bằng chứng đính kèm. $$;
+COMMENT ON COLUMN biosec.killer_event_attachment.attachment_id IS $$ File bằng chứng thực tế (ảnh/video). $$;
+COMMENT ON COLUMN biosec.killer_event_attachment.caption IS $$ Chú thích ngắn cho file. $$;
+
 COMMENT ON TABLE biosec.task_review IS $$ Bảng lịch sử review bằng chứng/kết quả task. $$;
 COMMENT ON COLUMN biosec.task_review.id IS $$ Khóa chính (PK) của bảng. $$;
 COMMENT ON COLUMN biosec.task_review.task_id IS $$ Task được chuyên gia hoặc reviewer xem xét. $$;
@@ -1196,6 +1210,8 @@ ALTER TABLE biosec.task_assignee ADD CONSTRAINT fk_task_assignee_task_id FOREIGN
 ALTER TABLE biosec.task_assignee ADD CONSTRAINT fk_task_assignee_user_id FOREIGN KEY (user_id) REFERENCES biosec.app_user(id) ON DELETE CASCADE;
 ALTER TABLE biosec.task_attachment ADD CONSTRAINT fk_task_attachment_task_id FOREIGN KEY (task_id) REFERENCES biosec.corrective_task(id) ON DELETE CASCADE;
 ALTER TABLE biosec.task_attachment ADD CONSTRAINT fk_task_attachment_attachment_id FOREIGN KEY (attachment_id) REFERENCES biosec.attachment(id) ON DELETE CASCADE;
+ALTER TABLE biosec.killer_event_attachment ADD CONSTRAINT fk_killer_event_attachment_event_id FOREIGN KEY (event_id) REFERENCES biosec.killer_metric_event(id) ON DELETE CASCADE;
+ALTER TABLE biosec.killer_event_attachment ADD CONSTRAINT fk_killer_event_attachment_attachment_id FOREIGN KEY (attachment_id) REFERENCES biosec.attachment(id) ON DELETE CASCADE;
 ALTER TABLE biosec.task_review ADD CONSTRAINT fk_task_review_task_id FOREIGN KEY (task_id) REFERENCES biosec.corrective_task(id) ON DELETE CASCADE;
 ALTER TABLE biosec.task_review ADD CONSTRAINT fk_task_review_reviewer_user_id FOREIGN KEY (reviewer_user_id) REFERENCES biosec.app_user(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.task_comment ADD CONSTRAINT fk_task_comment_task_id FOREIGN KEY (task_id) REFERENCES biosec.corrective_task(id) ON DELETE CASCADE;
@@ -1233,6 +1249,7 @@ ALTER TABLE biosec.case_participant ADD CONSTRAINT uq_case_participant_case_id_u
 ALTER TABLE biosec.corrective_task ADD CONSTRAINT uq_corrective_task_task_no UNIQUE (task_no);
 ALTER TABLE biosec.task_assignee ADD CONSTRAINT uq_task_assignee_task_id_user_id_responsibility_type UNIQUE (task_id, user_id, responsibility_type);
 ALTER TABLE biosec.task_attachment ADD CONSTRAINT uq_task_attachment_task_id_attachment_id UNIQUE (task_id, attachment_id);
+ALTER TABLE biosec.killer_event_attachment ADD CONSTRAINT uq_killer_event_attachment_event_id_attachment_id UNIQUE (event_id, attachment_id);
 ALTER TABLE biosec.scar_link ADD CONSTRAINT uq_scar_link_scar_id_linked_object_type_linked_object_id UNIQUE (scar_id, linked_object_type, linked_object_id);
 ALTER TABLE biosec.lesson_learned ADD CONSTRAINT uq_lesson_learned_lesson_no UNIQUE (lesson_no);
 ALTER TABLE biosec.lesson_reference ADD CONSTRAINT uq_lesson_reference_lesson_id_reference_type_reference_id UNIQUE (lesson_id, reference_type, reference_id);
@@ -1417,6 +1434,8 @@ CREATE INDEX idx_task_assignee_task_id ON biosec.task_assignee (task_id);
 CREATE INDEX idx_task_assignee_user_id ON biosec.task_assignee (user_id);
 CREATE INDEX idx_task_attachment_task_id ON biosec.task_attachment (task_id);
 CREATE INDEX idx_task_attachment_attachment_id ON biosec.task_attachment (attachment_id);
+CREATE INDEX idx_killer_event_attachment_event_id ON biosec.killer_event_attachment (event_id);
+CREATE INDEX idx_killer_event_attachment_attachment_id ON biosec.killer_event_attachment (attachment_id);
 CREATE INDEX idx_task_review_task_id ON biosec.task_review (task_id);
 CREATE INDEX idx_task_review_reviewer_user_id ON biosec.task_review (reviewer_user_id);
 CREATE INDEX idx_task_comment_task_id ON biosec.task_comment (task_id);

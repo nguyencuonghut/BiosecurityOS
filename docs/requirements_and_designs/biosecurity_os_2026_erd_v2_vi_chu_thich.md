@@ -593,6 +593,15 @@ Bảng file bằng chứng gắn cho task.
 | is_primary_evidence | boolean | Có | Đánh dấu đây là bằng chứng chính để reviewer xem đầu tiên. |
 | caption | text | Không | Chú thích ngắn cho file. |
 
+### `killer_event_attachment`
+Bảng file bằng chứng gắn cho sự kiện killer metric.
+| Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |
+|---|---|---:|---|
+| id | uuid | Có | Khóa chính (PK) của bảng. |
+| event_id | uuid | Có | Sự kiện killer metric mà file bằng chứng đính kèm. |
+| attachment_id | uuid | Có | File bằng chứng thực tế (ảnh/video). |
+| caption | text | Không | Chú thích ngắn cho file, VD: "Ảnh hiện trường vi phạm". |
+
 ### `task_review`
 Bảng lịch sử review bằng chứng/kết quả task.
 | Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |

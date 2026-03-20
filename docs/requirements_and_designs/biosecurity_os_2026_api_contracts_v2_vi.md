@@ -416,7 +416,35 @@ Request:
 
 ### GET `/killer-metric-events/{event_id}`
 ### PATCH `/killer-metric-events/{event_id}`
+
 ### POST `/killer-metric-events/{event_id}/attachments`
+Gắn file bằng chứng (ảnh/video) cho sự kiện killer metric. Bằng chứng phải được upload qua presign trước.
+
+Request:
+```json
+{
+  "attachment_id": "att_001",
+  "caption": "Ảnh hiện trường vi phạm luồng sạch"
+}
+```
+
+Response:
+```json
+{
+  "data": {
+    "id": "kea_001",
+    "event_id": "ke_001",
+    "attachment_id": "att_001",
+    "caption": "Ảnh hiện trường vi phạm luồng sạch"
+  }
+}
+```
+
+### GET `/killer-metric-events/{event_id}/attachments`
+Trả về danh sách file bằng chứng đã gắn cho sự kiện killer metric.
+
+### DELETE `/killer-metric-events/{event_id}/attachments/{attachment_id}`
+Xóa liên kết bằng chứng khỏi sự kiện (không xóa file gốc).
 
 ---
 
@@ -773,11 +801,12 @@ Chỉ cho admin hoặc role chuyên biệt.
 
 ## 4.2 Luồng killer metric
 
-1. `POST /killer-metric-events`
-2. Gắn evidence nếu có
-3. `POST /cases`
-4. `POST /cases/{id}/assign-expert`
-5. RCA và task như luồng trên
+1. `POST /killer-metric-events` — ghi nhận sự kiện vi phạm
+2. `POST /attachments/presign` + `POST /attachments/{id}/finalize` — upload ảnh/video bằng chứng
+3. `POST /killer-metric-events/{event_id}/attachments` — gắn bằng chứng vào event
+4. `POST /cases` với `source_killer_event_id` — mở case (bắt buộc)
+5. `POST /cases/{id}/assign-expert` — phân công chuyên gia
+6. RCA → Task → Evidence → Review như luồng 4.1
 
 ## 4.3 Luồng scar memory
 

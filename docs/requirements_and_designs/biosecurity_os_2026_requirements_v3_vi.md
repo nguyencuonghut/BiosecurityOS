@@ -339,6 +339,13 @@ Khi xảy ra killer metric, hệ thống phải:
 - bắt buộc mở case review,
 - yêu cầu phê duyệt của chuyên gia trước khi đóng.
 
+#### FR-08a. Bằng chứng cho Killer Metric Event
+Mỗi sự kiện killer metric phải hỗ trợ đính kèm **một hoặc nhiều file bằng chứng** (ảnh, video) để chứng minh vi phạm đã xảy ra. Bằng chứng phải:
+
+- được upload qua cơ chế presign và lưu trữ trên object storage,
+- liên kết với sự kiện qua bảng trung gian `killer_event_attachment`,
+- không bị xóa vật lý khi event đã có case liên kết.
+
 ### FR-09. Trust Score
 Hệ thống phải tính và hiển thị Trust Score dựa trên độ lệch giữa:
 
