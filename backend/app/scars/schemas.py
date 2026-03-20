@@ -13,6 +13,14 @@ from pydantic import BaseModel, ConfigDict, Field
 VALID_SCAR_TYPES = ("outbreak", "hotspot", "repeated_breach", "near_miss", "structural_flaw")
 VALID_CONFIDENCE_LEVELS = ("suspected", "probable", "confirmed")
 
+SCAR_TYPE_LABELS: dict[str, str] = {
+    "outbreak": "Ổ dịch",
+    "hotspot": "Điểm nóng",
+    "repeated_breach": "Vi phạm lặp lại",
+    "near_miss": "Suýt xảy ra",
+    "structural_flaw": "Lỗi cấu trúc",
+}
+
 
 class ScarCreate(BaseModel):
     farm_id: uuid.UUID

@@ -43,7 +43,7 @@ function scarSeverity(count) {
 
         <Column field="scar_type" header="Loại Scar" style="width: 20%">
           <template #body="{ data: row }">
-            <Tag :value="row.scar_type" severity="secondary" />
+            <Tag :value="row.scar_type_label || row.scar_type" severity="secondary" />
           </template>
         </Column>
 

@@ -19,6 +19,7 @@ from app.auth.models import Farm, Region
 from app.cases.models import RiskCase
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
 from app.scars.models import ScarRecord
+from app.scars.schemas import SCAR_TYPE_LABELS
 from app.shared.cache import cache_get, cache_set
 from app.tasks.models import CorrectiveTask
 from app.trust_scores.models import TrustScoreSnapshot
@@ -517,6 +518,7 @@ async def scar_hotspots(
             "farm_name": r.farm_name,
             "farm_code": r.farm_code,
             "scar_type": r.scar_type,
+            "scar_type_label": SCAR_TYPE_LABELS.get(r.scar_type, r.scar_type),
             "scar_count": r.scar_count,
             "recurring_count": r.recurring_count,
             "total_recurrence": r.total_recurrence or 0,
