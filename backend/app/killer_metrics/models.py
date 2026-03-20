@@ -50,3 +50,21 @@ class KillerMetricEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     definition: Mapped["KillerMetricDefinition"] = relationship(back_populates="events")
+    event_attachments: Mapped[list["KillerEventAttachment"]] = relationship(
+        back_populates="event", cascade="all, delete-orphan"
+    )
+
+
+class KillerEventAttachment(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "killer_event_attachment"
+
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("biosec.killer_metric_event.id", ondelete="CASCADE"), nullable=False
+    )
+    attachment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("biosec.attachment.id", ondelete="CASCADE"), nullable=False
+    )
+    caption: Mapped[str | None] = mapped_column(Text)
+
+    event: Mapped["KillerMetricEvent"] = relationship(back_populates="event_attachments")
+    attachment = relationship("Attachment", lazy="raise")

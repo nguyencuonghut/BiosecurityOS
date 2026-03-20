@@ -105,6 +105,45 @@ async def update_event(
     return success_response(request, _event_to_dict(event), headers=etag_headers(event.version))
 
 
+# ── Event Attachments (FR-08a) ──
+
+@event_router.get("/{event_id}/attachments", dependencies=[require_permission("KILLER_EVENT_READ")])
+async def list_event_attachments(
+    request: Request,
+    event_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    links = await service.list_event_attachments(db, event_id)
+    data = [schemas.KillerEventAttachmentDetailOut.model_validate(lk).model_dump(mode="json") for lk in links]
+    return success_response(request, data)
+
+
+@event_router.post("/{event_id}/attachments", dependencies=[require_permission("KILLER_EVENT_WRITE")])
+async def add_event_attachment(
+    request: Request,
+    event_id: uuid.UUID,
+    payload: schemas.KillerEventAttachmentCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    link = await service.add_event_attachment(db, event_id, payload)
+    data = schemas.KillerEventAttachmentOut.model_validate(link).model_dump(mode="json")
+    return success_response(request, data, status_code=201)
+
+
+@event_router.delete(
+    "/{event_id}/attachments/{attachment_id}",
+    dependencies=[require_permission("KILLER_EVENT_WRITE")],
+)
+async def remove_event_attachment(
+    request: Request,
+    event_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await service.remove_event_attachment(db, event_id, attachment_id)
+    return success_response(request, None)
+
+
 # ── Helper ──
 
 def _event_to_dict(event) -> dict:

@@ -38,3 +38,20 @@ export async function updateEvent(id, payload) {
   const { data } = await apiClient.patch(`/killer-metric-events/${id}`, payload)
   return data.data
 }
+
+// ── Event Attachments ──────────────────────────────────────────
+
+export async function listEventAttachments(eventId) {
+  const { data } = await apiClient.get(`/killer-metric-events/${eventId}/attachments`)
+  return data.data
+}
+
+export async function addEventAttachment(eventId, payload) {
+  const { data } = await apiClient.post(`/killer-metric-events/${eventId}/attachments`, payload)
+  return data.data
+}
+
+export async function removeEventAttachment(eventId, attachmentId) {
+  const { data } = await apiClient.delete(`/killer-metric-events/${eventId}/attachments/${attachmentId}`)
+  return data.data
+}

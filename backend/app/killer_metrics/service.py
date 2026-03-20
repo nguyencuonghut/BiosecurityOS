@@ -9,12 +9,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
+from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent, KillerEventAttachment
 from app.killer_metrics.schemas import (
     KillerMetricDefinitionCreate,
     KillerMetricDefinitionUpdate,
     KillerMetricEventCreate,
     KillerMetricEventUpdate,
+    KillerEventAttachmentCreate,
 )
 from app.shared.exceptions import AppException, ConflictException, NotFoundException
 from app.shared.optimistic_lock import apply_version_update, check_version
@@ -250,6 +251,60 @@ async def _create_killer_alert(
         )
         db.add(notif)
     await db.flush()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Event Attachments (FR-08a)
+# ═══════════════════════════════════════════════════════════════════
+
+async def list_event_attachments(db: AsyncSession, event_id: uuid.UUID) -> list[KillerEventAttachment]:
+    await get_event(db, event_id)
+    from app.attachments.models import Attachment
+    result = await db.execute(
+        select(KillerEventAttachment)
+        .join(KillerEventAttachment.attachment)
+        .options(selectinload(KillerEventAttachment.attachment))
+        .where(KillerEventAttachment.event_id == event_id)
+        .where(Attachment.archived_at.is_(None))
+    )
+    return list(result.scalars().all())
+
+
+async def add_event_attachment(
+    db: AsyncSession, event_id: uuid.UUID, data: KillerEventAttachmentCreate
+) -> KillerEventAttachment:
+    await get_event(db, event_id)
+
+    from app.attachments.models import Attachment
+    result = await db.execute(select(Attachment).where(Attachment.id == data.attachment_id))
+    if not result.scalar_one_or_none():
+        raise NotFoundException("Attachment not found.")
+
+    link = KillerEventAttachment(
+        event_id=event_id,
+        attachment_id=data.attachment_id,
+        caption=data.caption,
+    )
+    db.add(link)
+    await db.flush()
+    await db.refresh(link)
+    await db.commit()
+    return link
+
+
+async def remove_event_attachment(db: AsyncSession, event_id: uuid.UUID, attachment_id: uuid.UUID) -> None:
+    await get_event(db, event_id)
+    result = await db.execute(
+        select(KillerEventAttachment).where(
+            KillerEventAttachment.event_id == event_id,
+            KillerEventAttachment.attachment_id == attachment_id,
+        )
+    )
+    link = result.scalar_one_or_none()
+    if not link:
+        raise NotFoundException("Attachment link not found.")
+    await db.delete(link)
+    await db.commit()
 
 
 # ═══════════════════════════════════════════════════════════════════

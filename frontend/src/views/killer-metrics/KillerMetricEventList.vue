@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -9,11 +10,11 @@ import Toast from 'primevue/toast'
 import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
-import InputText from 'primevue/inputtext'
 import { useKillerMetricStore } from '@/stores/killerMetric.js'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
 
+const router = useRouter()
 const toast = useToast()
 const store = useKillerMetricStore()
 const farmStore = useFarmStore()
@@ -233,20 +234,30 @@ onMounted(async () => {
           <Tag :value="statusLabel(data.status)" :severity="statusColor(data.status)" />
         </template>
       </Column>
-      <Column header="Hành động" style="width: 160px">
+      <Column header="Hành động" style="width: 200px">
         <template #body="{ data }">
-          <div class="action-btns" v-if="data.status !== 'closed'">
+          <div class="action-btns">
             <Button
-              v-for="target in nextActions(data.status)"
-              :key="target"
-              :label="statusLabel(target)"
+              icon="pi pi-eye"
               size="small"
-              :severity="statusColor(target)"
+              severity="info"
               outlined
-              @click="openTransition(data, target)"
+              v-tooltip.top="'Chi tiết'"
+              @click="router.push(`/killer-metrics/events/${data.id}`)"
             />
+            <template v-if="data.status !== 'closed'">
+              <Button
+                v-for="target in nextActions(data.status)"
+                :key="target"
+                :label="statusLabel(target)"
+                size="small"
+                :severity="statusColor(target)"
+                outlined
+                @click="openTransition(data, target)"
+              />
+            </template>
+            <Tag v-else value="Đã đóng" severity="success" />
           </div>
-          <Tag v-else value="Đã đóng" severity="success" />
         </template>
       </Column>
       <template #empty>
