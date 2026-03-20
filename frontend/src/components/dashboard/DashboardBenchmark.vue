@@ -80,7 +80,7 @@ function navigateToFarm(farmId) {
           <template #body="slotProps">
             <Tag
               :value="`Top ${slotProps.data.percentile != null ? slotProps.data.percentile.toFixed(0) : '—'}%`"
-              :severity="scoreSeverity(slotProps.data.percentile != null ? (100 - slotProps.data.percentile) : null)"
+              :severity="scoreSeverity(slotProps.data.percentile)"
             />
           </template>
         </Column>
