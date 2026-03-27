@@ -209,3 +209,22 @@ async def get_me(db: AsyncSession, user_id: uuid.UUID) -> MeResponse:
         roles=roles,
         permissions=permissions,
     )
+
+
+# ── B11.7: Token blacklist cleanup job ─────────────────────────
+
+async def cleanup_expired_refresh_tokens(db: AsyncSession) -> int:
+    """Delete AppRefreshToken rows that are expired or revoked.
+
+    Runs periodically (every 1 hour via main.py background task) to prevent
+    the table from growing unboundedly. Returns count of deleted rows.
+    """
+    from sqlalchemy import delete
+
+    stmt = delete(AppRefreshToken).where(
+        (AppRefreshToken.expires_at <= datetime.now(UTC))
+        | (AppRefreshToken.revoked_at.is_not(None))
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    return result.rowcount

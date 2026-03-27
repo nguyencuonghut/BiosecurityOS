@@ -1,8 +1,10 @@
 """BIOSECURITY OS 2026 — FastAPI Application."""
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi.exceptions import RequestValidationError
@@ -16,14 +18,83 @@ from app.shared.exceptions import (
 from app.shared.middleware import audit_log_middleware, request_id_middleware, security_headers_middleware
 from app.shared.rate_limiter import rate_limit_middleware
 
+logger = logging.getLogger(__name__)
+
+# ── Prometheus metrics (B11.8) ──────────────────────────────────
+try:
+    from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        Counter,
+        Histogram,
+        generate_latest,
+        REGISTRY,
+    )
+    import time as _time
+
+    _http_requests_total = Counter(
+        "http_requests_total",
+        "Total HTTP requests",
+        ["method", "endpoint", "status_code"],
+    )
+    _http_request_duration = Histogram(
+        "http_request_duration_seconds",
+        "HTTP request duration in seconds",
+        ["method", "endpoint"],
+        buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+    )
+    _PROMETHEUS_AVAILABLE = True
+except ImportError:
+    _PROMETHEUS_AVAILABLE = False
+    logger.warning("prometheus_client not installed — /metrics endpoint disabled.")
+
+
+async def _prometheus_middleware(request, call_next):
+    """Record request count and duration for Prometheus scraping."""
+    if not _PROMETHEUS_AVAILABLE:
+        return await call_next(request)
+    start = _time.perf_counter()
+    response = await call_next(request)
+    duration = _time.perf_counter() - start
+    # Use route path template (e.g. /api/v1/farms/{farm_id}) to avoid high cardinality
+    route = request.scope.get("route")
+    endpoint = route.path if route else request.url.path
+    _http_requests_total.labels(
+        method=request.method,
+        endpoint=endpoint,
+        status_code=str(response.status_code),
+    ).inc()
+    _http_request_duration.labels(method=request.method, endpoint=endpoint).observe(duration)
+    return response
+
+
+# ── Token cleanup background task (B11.7) ──────────────────────
+async def _token_cleanup_loop() -> None:
+    """Periodically delete expired / revoked refresh tokens (every 1 hour)."""
+    from app.database import async_session_factory
+    from app.auth.service import cleanup_expired_refresh_tokens
+
+    while True:
+        await asyncio.sleep(3600)  # wait 1 hour before first run
+        try:
+            async with async_session_factory() as db:
+                deleted = await cleanup_expired_refresh_tokens(db)
+            logger.info("Token cleanup: deleted %d expired/revoked refresh tokens.", deleted)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Token cleanup failed: %s", exc)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle — replaces deprecated @app.on_event."""
     # ── Startup ──
-    # Connection pools are lazily initialized by SQLAlchemy and Redis clients
+    cleanup_task = asyncio.create_task(_token_cleanup_loop())
     yield
     # ── Shutdown ──
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
     from app.database import engine
     from app.shared.cache import close_redis
 
@@ -51,6 +122,8 @@ app.middleware("http")(security_headers_middleware)
 app.middleware("http")(audit_log_middleware)
 app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(request_id_middleware)
+if _PROMETHEUS_AVAILABLE:
+    app.middleware("http")(_prometheus_middleware)
 
 # ── Exception handlers ──
 app.add_exception_handler(AppException, app_exception_handler)
@@ -61,6 +134,15 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 @app.get("/health", tags=["infra"])
 async def health_check():
     return {"status": "ok", "service": settings.APP_NAME}
+
+
+# ── Prometheus metrics (B11.8) ──────────────────────────────────
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus scrape endpoint. Restricted to internal/ops access in production."""
+    if not _PROMETHEUS_AVAILABLE:
+        return Response(content="prometheus_client not installed", status_code=503)
+    return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── API routers (will be added as modules are implemented) ──

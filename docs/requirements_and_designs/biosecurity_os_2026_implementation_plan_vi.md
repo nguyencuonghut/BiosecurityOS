@@ -815,22 +815,54 @@ Phase A ──→ Phase B ──→ Phase C ──→ Phase D
 
 ### SPRINT 11 — Performance, Security & Mobile
 
-**Mục tiêu:** Tối ưu hiệu năng, hardening bảo mật, responsive mobile.
+**Mục tiêu:** Tối ưu hiệu năng, hardening bảo mật, responsive mobile, hoàn thiện PWA.
 
-#### Tasks
+> **Ghi chú trạng thái scaffold đã có:**
+> - `backend/app/shared/cache.py` — Redis cache utility (get/set/delete_pattern) đã triển khai
+> - `backend/app/shared/rate_limiter.py` — Redis-based rate limiter middleware đã triển khai
+> - `backend/app/shared/middleware.py` — Security headers middleware đã triển khai
+> - `backend/app/database.py` — Connection pool `pool_size=30`, `max_overflow=20`, `pool_pre_ping=True` đã cấu hình
+> - `nginx/nginx.conf` — TLS 1.2/1.3, HSTS, CSP, OCSP stapling đã cấu hình → SSL Labs grade A
+> - `frontend/src/components/common/WatermarkCameraCapture.vue` — Camera + watermark đã triển khai
+>
+> Sprint 11 hoàn thiện tích hợp, đo lường, và các hạng mục còn thiếu.
 
-| # | Task | NFR | Output | Acceptance Criteria |
-|---|------|-----|--------|---------------------|
-| 11.1 | Database query optimization | NFR-02 | EXPLAIN ANALYZE cho top 20 queries | Tất cả P95 ≤ 500ms |
-| 11.2 | Redis caching strategy | NFR-02 | Cache lookup_code, scorecard_template, dashboard | Cache hit ratio > 80% |
-| 11.3 | Connection pooling tuning | NFR-01 | SQLAlchemy pool_size, max_overflow | Handle 100 concurrent users |
-| 11.4 | API rate limiting | NFR-08a | Redis-based rate limiter | Global: 100 req/min/user, Upload: 30 files/min/user |
-| 11.5 | Security audit | NFR-07 | OWASP Top 10 checklist | SQL injection, XSS, CSRF, auth bypass — tất cả PASS |
-| 11.6 | TLS configuration | NFR-07 | Nginx TLS 1.2+, HSTS, CSP headers | SSL Labs grade A |
-| 11.7 | Mobile responsive UI | NFR-03, NFR-09 | CSS responsive cho tất cả pages | Hoạt động trên mobile 375px+, touch-friendly buttons |
-| 11.8 | Evidence capture (mobile) | FR-20 | Camera capture with watermark | GPS + timestamp + user info overlay trên photo |
-| 11.9 | Offline queue (basic) | NFR-10 | Service worker + IndexedDB queue | Lưu pending actions khi offline, retry khi online |
-| 11.10 | Penetration testing | NFR-07 | Test report | Không có critical/high vulnerability |
+#### Backend Tasks
+
+| # | Task | FR/NFR | Output | Acceptance Criteria |
+|---|------|--------|--------|---------------------|
+| B11.1 | DB index audit & slow query tuning | NFR-02 | `scripts/explain_analyze_top20.sql`, index migration | `EXPLAIN ANALYZE` tất cả 20 endpoint quan trọng; P95 ≤ 500ms; thêm index thiếu vào migration mới |
+| B11.2 | Tích hợp `cache.py` vào endpoints | NFR-02 | `dashboards/service.py`, `scorecards/service.py`, `farms/service.py` dùng cache | Dashboard cache TTL 5 phút; lookup_code cache TTL 1 giờ; scorecard template cache TTL 30 phút; cache invalidate khi data thay đổi |
+| B11.3 | Wire rate limiter vào `main.py` | NFR-08a | `main.py` (middleware stack) | Global 100 req/min/user → 429 + `Retry-After`; Upload 30 files/min/user → 429; unit test verify |
+| B11.4 | Seed bổ sung permission còn thiếu | NFR-07 | `V002__seed_reference_data.sql` cập nhật | Thêm codes: `KILLER_EVENT_READ`, `KILLER_EVENT_WRITE`, `ASSESSMENT_READ`, `ASSESSMENT_WRITE`, `ATTACHMENT_UPLOAD`, `ATTACHMENT_READ`, `ATTACHMENT_DELETE`, `AUDIT_LOG_READ`; gán `role_permission` hợp lý cho từng role |
+| B11.5 | Input sanitization & model hardening | NFR-07 | Pydantic model config, validator | Tất cả Create/Update schema dùng `model_config = ConfigDict(extra="forbid")`; string fields strip whitespace; path traversal không thể qua file name |
+| B11.6 | Security audit — OWASP Top 10 | NFR-07 | `docs/security_audit_checklist.md` | Chạy `bandit -r backend/app`, `safety check`; resolve tất cả HIGH; checklist tay: A01 auth bypass, A03 injection, A05 security misconfig, A07 auth failures — tất cả PASS |
+| B11.7 | Token blacklist cleanup job | NFR-07 | `auth/service.py` (background task) | Scheduled job xóa expired tokens khỏi Redis mỗi 1 giờ; không để Redis OOM bởi stale blacklist |
+| B11.8 | Prometheus metrics endpoint | NFR-01 | `GET /metrics` (prometheus_client) | Expose: `http_request_duration_seconds`, `http_requests_total` (by endpoint, status); scrape được bởi Prometheus |
+| B11.9 | Load test với k6 | NFR-01, NFR-02 | `scripts/load_test.js` (k6 script) | 100 VUs × 5 phút; P95 latency ≤ 500ms; error rate < 1%; kết quả lưu `docs/load_test_results.md` |
+
+#### Frontend Tasks
+
+| # | Task | Output | Acceptance Criteria |
+|---|------|--------|---------------------|
+| F11.1 | Responsive layout audit & fix | Tất cả `.vue` views cập nhật | Kiểm tra 375px/768px/1024px với Chrome DevTools; không horizontal scroll; font ≥ 14px; buttons ≥ 44px tap target |
+| F11.2 | Touch-friendly PrimeVue overrides | `styles/mobile.css` | DataTable dùng card layout ở mobile; Dialog fullscreen ở 375px; Drawer width 100% ở mobile |
+| F11.3 | PWA: manifest + `vite-plugin-pwa` | `vite.config.js`, `public/manifest.json` | `npm run build` sinh `sw.js`; App installable (Chrome "Add to Home Screen"); icon 192/512px |
+| F11.4 | Offline queue — IndexedDB + retry | `composables/useOfflineQueue.js` | Lưu `POST/PATCH` khi offline vào IndexedDB; khi online auto retry theo FIFO; toast thông báo khi sync thành công |
+| F11.5 | Bundle analysis & code splitting | `vite.config.js` (manualChunks) | `npm run build` + `rollup-plugin-visualizer`; chunk trang trọng ≤ 300 KB gzipped; vendor chunk tách riêng; lazy-load views nặng (ScarMap, Dashboard) |
+| F11.6 | Kiểm tra WatermarkCameraCapture | `WatermarkCameraCapture.vue` (hoàn thiện nếu thiếu) | Test thực tế trên mobile Chrome: camera mở, chụp ảnh, watermark GPS + timestamp + username hiển thị trên canvas, file upload được |
+| F11.7 | CSP nonce/hash cho inline script | `index.html`, `nginx.conf` | Loại bỏ `'unsafe-inline'` khỏi `script-src`; dùng nonce hoặc hash; không có console error CSP nào trong production build |
+
+#### Kiểm thử Sprint 11
+
+- **Performance:** Chạy k6 script (`scripts/load_test.js`) — 100 VUs, 5 phút; verify P95 ≤ 500ms cho `/api/v1/dashboards/executive-summary`, `/api/v1/assessments`, `/api/v1/cases`
+- **Cache hit ratio:** Gọi dashboard endpoint 10 lần liên tiếp; `redis-cli monitor` xác nhận cache hit từ lần 2 trở đi; hit ratio > 80%
+- **Rate limiting:** Script gửi 110 request/phút → expect lần thứ 101 trả 429 + header `Retry-After`
+- **Security (automated):** `bandit -r backend/app -ll` → 0 HIGH issues; `safety check` → 0 critical vulnerabilities
+- **Security (manual):** OWASP checklist A01–A10 — SQL injection (parameterized query test), XSS (reflected header test), IDOR (truy cập resource của user khác), JWT tampering (sửa payload → expect 401)
+- **Mobile UI:** Chrome DevTools Nexus 5X (375×667) — login, fill assessment, upload photo, view scar map; không overflow, không cut-off button
+- **PWA:** Chrome "Add to Home Screen" hoạt động; offline page hiển thị khi mất mạng; pending action được sync khi online
+- **Penetration test (basic):** OWASP ZAP spider + active scan trên staging; không có critical/high alert; kết quả lưu `docs/pentest_report.md`
 
 ---
 

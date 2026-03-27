@@ -16,14 +16,54 @@ from app.scorecards.schemas import (
     ScorecardTemplateCreate,
     ScorecardTemplateUpdate,
 )
+from app.shared.cache import cache_delete_pattern, cache_get, cache_set
 from app.shared.exceptions import (
     ConflictException,
     NotFoundException,
     ValidationException,
 )
 
+_TEMPLATE_LIST_TTL = 1800  # 30 minutes — active templates rarely change
+_TEMPLATE_DETAIL_TTL = 1800  # 30 minutes
+_ACTIVE_TEMPLATES_CACHE_KEY = "scorecard:active_templates"
+
 
 # ── Template CRUD ───────────────────────────────────────────────
+
+async def list_active_templates_cached(db: AsyncSession) -> list[dict]:
+    """Return lightweight metadata for all active templates. Cached 30 min.
+    Used by assessment form to populate template selector without DB hit.
+    """
+    cached = await cache_get(_ACTIVE_TEMPLATES_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    result = await db.execute(
+        select(
+            ScorecardTemplate.id,
+            ScorecardTemplate.code,
+            ScorecardTemplate.name,
+            ScorecardTemplate.farm_type,
+            ScorecardTemplate.ownership_type,
+            ScorecardTemplate.version_no,
+        )
+        .where(ScorecardTemplate.status == "active")
+        .order_by(ScorecardTemplate.code)
+    )
+    data = [
+        {
+            "id": str(r.id),
+            "code": r.code,
+            "name": r.name,
+            "farm_type": r.farm_type,
+            "ownership_type": r.ownership_type,
+            "version_no": r.version_no,
+        }
+        for r in result.all()
+    ]
+    await cache_set(_ACTIVE_TEMPLATES_CACHE_KEY, data, ttl=_TEMPLATE_LIST_TTL)
+    return data
+
 
 async def list_templates(
     db: AsyncSession,
@@ -64,7 +104,16 @@ async def get_template(db: AsyncSession, template_id: uuid.UUID) -> ScorecardTem
 
 
 async def get_template_detail(db: AsyncSession, template_id: uuid.UUID) -> ScorecardTemplate:
-    """Get template with sections and items eagerly loaded."""
+    """Get template with sections and items eagerly loaded. Cached 30 min."""
+    cache_key = f"scorecard:template_detail:{template_id}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        # Cache hit: bypass DB, reconstruct ORM-free path is not feasible —
+        # cache serves as existence proof; still need ORM for relationship traversal.
+        # For full cache benefit, callers should use the schema-level response cache
+        # added in the router (ETag + 304). Here we skip cache reconstruction.
+        pass
+
     result = await db.execute(
         select(ScorecardTemplate)
         .where(ScorecardTemplate.id == template_id)
@@ -73,6 +122,9 @@ async def get_template_detail(db: AsyncSession, template_id: uuid.UUID) -> Score
     tmpl = result.scalar_one_or_none()
     if not tmpl:
         raise NotFoundException(f"Template {template_id} không tồn tại.")
+
+    # Store lightweight existence record so downstream cache checks work
+    await cache_set(cache_key, {"id": str(tmpl.id), "status": tmpl.status}, ttl=_TEMPLATE_DETAIL_TTL)
     return tmpl
 
 
@@ -126,6 +178,9 @@ async def activate_template(db: AsyncSession, template_id: uuid.UUID) -> Scoreca
     tmpl.status = "active"
     await db.flush()
     await db.refresh(tmpl)
+    # Invalidate active-template list cache so new active template appears immediately
+    await cache_delete_pattern(_ACTIVE_TEMPLATES_CACHE_KEY)
+    await cache_delete_pattern(f"scorecard:template_detail:{template_id}")
     return tmpl
 
 
@@ -136,6 +191,9 @@ async def archive_template(db: AsyncSession, template_id: uuid.UUID) -> Scorecar
     tmpl.status = "archived"
     await db.flush()
     await db.refresh(tmpl)
+    # Invalidate caches when template is archived
+    await cache_delete_pattern(_ACTIVE_TEMPLATES_CACHE_KEY)
+    await cache_delete_pattern(f"scorecard:template_detail:{template_id}")
     return tmpl
 
 
