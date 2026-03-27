@@ -126,7 +126,9 @@ erDiagram
     ASSESSMENT ||--o{ ASSESSMENT_ITEM_RESULT : records
     ASSESSMENT ||--o{ ASSESSMENT_ATTACHMENT : has
     KILLER_METRIC_DEFINITION ||--o{ KILLER_METRIC_EVENT : classifies
+    KILLER_METRIC_DEFINITION ||--o{ SCORECARD_ITEM : linked_to
     FARM ||--o{ KILLER_METRIC_EVENT : occurs_at
+    ASSESSMENT_ITEM_RESULT ||--o{ KILLER_METRIC_EVENT : triggers
     FARM ||--o{ TRUST_SCORE_SNAPSHOT : has
 
     FARM ||--o{ RISK_CASE : generates
@@ -388,7 +390,8 @@ Bảng tiêu chí/câu hỏi chi tiết dùng để chấm điểm.
 | response_type | varchar(30) | Có | Kiểu câu trả lời đầu vào, ví dụ yes_no, score_0_5, option, numeric. |
 | max_score | numeric(8,2) | Có | Điểm tối đa của tiêu chí. |
 | weight | numeric(8,2) | Có | Trọng số của tiêu chí trong nhóm. |
-| is_killer_related | boolean | Có | Đánh dấu tiêu chí này có liên quan tới killer metric hay không. |
+| killer_metric_definition_id | uuid | Không | FK tới `killer_metric_definition` — xác định tiêu chí này thuộc killer metric nào. Khi có giá trị, `is_killer_related` tự động là `true`. |
+| is_killer_related | boolean (GENERATED) | — | Cột tính toán tự động: `true` khi `killer_metric_definition_id IS NOT NULL`. Dùng để UI highlight, không cho phép nhập tay. |
 | threshold_warning | numeric(8,2) | Không | Ngưỡng cảnh báo để UI tô màu hoặc kích hoạt theo dõi. |
 | threshold_fail | numeric(8,2) | Không | Ngưỡng xem là không đạt nghiêm trọng. |
 | guidance_text | text | Không | Hướng dẫn chấm điểm hoặc giải thích tiêu chí cho người đánh giá. |
@@ -449,6 +452,7 @@ Bảng định nghĩa các killer metric của doanh nghiệp.
 | code | varchar(50) | Có | Mã killer metric, ví dụ SWILL_FEED hoặc RED_LINE_BREACH. |
 | name | varchar(255) | Có | Tên ngắn của killer metric. |
 | description | text | Có | Giải thích điều kiện nào được xem là vi phạm killer metric. |
+| source_type | varchar(30) | Có | Nguồn có thể kích hoạt killer metric này: `scorecard_item` (chỉ từ đánh giá), `field_report` (chỉ từ hiện trường), `both` (cả hai). Dùng để validate khi tạo event và để filter danh sách item phù hợp. |
 | severity_level | varchar(20) | Có | Mức độ nghiêm trọng chuẩn của killer metric. |
 | default_case_priority | varchar(20) | Có | Mức ưu tiên case mặc định khi metric này xảy ra. |
 | active_flag | boolean | Có | Có còn dùng metric này trong vận hành hiện tại hay không. |
@@ -463,9 +467,10 @@ Bảng sự kiện killer metric thực tế phát sinh.
 | definition_id | uuid | Có | Loại killer metric đã bị kích hoạt. |
 | event_at | timestamptz | Có | Thời điểm phát hiện hoặc ghi nhận sự kiện. |
 | detected_by_user_id | uuid | Có | Người phát hiện hoặc người ghi nhận sự kiện. |
-| source_type | varchar(30) | Có | Nguồn phát hiện: assessment, audit, field report... |
+| source_type | varchar(30) | Có | Nguồn kích hoạt event: `assessment` (phát hiện qua chấm điểm) hoặc `field_report` (báo cáo hiện trường trực tiếp). Phải khớp với `killer_metric_definition.source_type`. |
+| source_assessment_item_result_id | uuid | Không | FK tới `assessment_item_result` — bắt buộc có khi `source_type = 'assessment'`, phải NULL khi `source_type = 'field_report'`. Cho phép truy vết đến chính xác dòng kết quả đánh giá đã kích hoạt event. |
 | summary | text | Có | Mô tả ngắn nội dung vi phạm hoặc sự kiện. |
-| status | varchar(30) | Có | Trạng thái xử lý sự kiện killer metric. |
+| status | varchar(30) | Có | Trạng thái xử lý: `open` (mới phát hiện), `under_review` (đang xem xét), `controlled` (đã kiểm soát), `closed` (đã đóng), `rejected` (bác bỏ). |
 | required_case_flag | boolean | Có | Đánh dấu bắt buộc phải mở case review cho sự kiện này. |
 
 ### `trust_score_snapshot`
@@ -761,7 +766,10 @@ Bảng tùy chọn để chuẩn hóa code set như `status`, `priority`, `confi
 ## 6. Ràng buộc nghiệp vụ quan trọng ở mức dữ liệu
 
 1. `risk_case.case_no`, `corrective_task.task_no`, `lesson_learned.lesson_no` phải unique và có định dạng sinh số theo quy ước doanh nghiệp.
-2. `killer_metric_event` phải có case đi kèm trước khi chuyển sang trạng thái đóng.
+2. `killer_metric_event` phải có case đi kèm trước khi chuyển sang trạng thái `closed`.
+2a. `killer_metric_event.source_type = 'assessment'` thì `source_assessment_item_result_id` bắt buộc NOT NULL; `source_type = 'field_report'` thì phải NULL.
+2b. Khi tạo `killer_metric_event` từ assessment, `killer_metric_definition.source_type` phải là `'scorecard_item'` hoặc `'both'`; khi tạo từ field report phải là `'field_report'` hoặc `'both'` — app layer validate.
+2c. `scorecard_item.killer_metric_definition_id IS NOT NULL` kéo theo `is_killer_related = true` tự động (GENERATED ALWAYS AS). Không được nhập tay `is_killer_related`.
 3. `corrective_task` không được chuyển `closed` nếu chưa có ít nhất 1 `task_review.review_result = approved`.
 4. `lesson_learned.status = validated` chỉ được phép khi có `confirmed_by_user_id` và ít nhất 1 `lesson_reference`.
 5. `scar_record` gắn vào sơ đồ phải tham chiếu đúng `floorplan_version` tương ứng thời điểm sự kiện.

@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    Computed,
     Date as SADate,
     ForeignKey,
     Integer,
@@ -63,12 +64,18 @@ class ScorecardItem(UUIDPrimaryKeyMixin, Base):
     section_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("biosec.scorecard_section.id", ondelete="CASCADE"), nullable=False
     )
+    killer_metric_definition_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("biosec.killer_metric_definition.id", ondelete="SET NULL"), nullable=True
+    )
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     response_type: Mapped[str] = mapped_column(String(30), nullable=False)
     max_score: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     weight: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
-    is_killer_related: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    is_killer_related: Mapped[bool] = mapped_column(
+        Boolean,
+        Computed("killer_metric_definition_id IS NOT NULL", persisted=True),
+    )
     threshold_warning: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     threshold_fail: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     guidance_text: Mapped[str | None] = mapped_column(Text)

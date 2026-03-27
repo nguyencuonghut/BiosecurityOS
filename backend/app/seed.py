@@ -299,6 +299,14 @@ ITEMS_PER_SECTION = {
 
 async def _seed_scorecards(db: AsyncSession) -> dict:
     templates = {}
+
+    # Load killer metric definitions for FK linking
+    from app.killer_metrics.models import KillerMetricDefinition as KMDef
+    km_result = await db.execute(select(KMDef))
+    km_defs = {d.code: d for d in km_result.scalars().all()}
+    # Map is_killer flag → a relevant definition (use first active one as fallback)
+    fallback_km = next(iter(km_defs.values()), None)
+
     TEMPLATES = [
         ("SC-SOW-V1", "Scorecard ATSH — Trại nái", "sow", 1),
         ("SC-FIN-V1", "Scorecard ATSH — Trại thịt", "finisher", 1),
@@ -328,11 +336,13 @@ async def _seed_scorecards(db: AsyncSession) -> dict:
             await db.flush()
 
             for idx, (q_text, resp_type, max_score, is_killer) in enumerate(ITEMS_PER_SECTION.get(s_suffix, []), 1):
+                km_def_id = fallback_km.id if is_killer and fallback_km else None
                 db.add(ScorecardItem(
                     section_id=section.id, code=f"{t_code}-{s_suffix}-{idx:02d}",
                     question_text=q_text, response_type=resp_type,
                     max_score=Decimal(str(max_score)), weight=Decimal("1"),
-                    is_killer_related=is_killer, display_order=idx,
+                    killer_metric_definition_id=km_def_id,
+                    display_order=idx,
                 ))
 
         print(f"  Created scorecard: {t_code}")
@@ -487,22 +497,22 @@ async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users:
         ("FARM-C01", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Heo chết không được xử lý đúng quy trình trong 4h", 7, "open"),
         ("FARM-N01", "DIRTY", "UNKNOWN_VISITOR", "farm_mgr", "Người lạ vào khu vực trại không đăng ký", 10, "under_review"),
         # 1 month ago
-        ("FARM-S03", "CLEAN", "SWILL_FEED", "expert", "Nhân viên mang đồ ăn ngoài vào khu sạch", 35, "contained"),
-        ("FARM-N03", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Xe lạ không đăng ký vào cổng trại", 40, "contained"),
-        ("FARM-C01", "DIRTY", "RED_LINE_BREACH", "expert", "Nhân viên đi tắt qua khu bẩn không thay đồ", 42, "contained"),
+        ("FARM-S03", "CLEAN", "SWILL_FEED", "expert", "Nhân viên mang đồ ăn ngoài vào khu sạch", 35, "controlled"),
+        ("FARM-N03", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Xe lạ không đăng ký vào cổng trại", 40, "controlled"),
+        ("FARM-C01", "DIRTY", "RED_LINE_BREACH", "expert", "Nhân viên đi tắt qua khu bẩn không thay đồ", 42, "controlled"),
         # 2 months ago
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Vi phạm vùng đỏ lần 2 — xe cám không sát trùng", 65, "contained"),
-        ("FARM-N03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Xác heo chết để quá 6h trong khu đệm", 70, "contained"),
-        ("FARM-S02", "CLEAN", "SWILL_FEED", "farm_mgr", "Phát hiện thức ăn thừa gần chuồng nái", 75, "contained"),
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Vi phạm vùng đỏ lần 2 — xe cám không sát trùng", 65, "controlled"),
+        ("FARM-N03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Xác heo chết để quá 6h trong khu đệm", 70, "controlled"),
+        ("FARM-S02", "CLEAN", "SWILL_FEED", "farm_mgr", "Phát hiện thức ăn thừa gần chuồng nái", 75, "controlled"),
         # 3 months ago
-        ("FARM-N03", "DIRTY", "RED_LINE_BREACH", "expert", "Xe vận chuyển không qua hố sát trùng", 95, "contained"),
-        ("FARM-C01", "CLEAN", "UNKNOWN_VISITOR", "farm_mgr", "Kỹ thuật viên bên ngoài vào khu sạch không tắm", 100, "contained"),
+        ("FARM-N03", "DIRTY", "RED_LINE_BREACH", "expert", "Xe vận chuyển không qua hố sát trùng", 95, "controlled"),
+        ("FARM-C01", "CLEAN", "UNKNOWN_VISITOR", "farm_mgr", "Kỹ thuật viên bên ngoài vào khu sạch không tắm", 100, "controlled"),
         # 4 months ago
-        ("FARM-S03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Vi phạm quy trình xử lý xác - chở ra ngoài", 125, "contained"),
-        ("FARM-N01", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Người bán hàng rong vào khu vực cổng trại", 130, "contained"),
+        ("FARM-S03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Vi phạm quy trình xử lý xác - chở ra ngoài", 125, "controlled"),
+        ("FARM-N01", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Người bán hàng rong vào khu vực cổng trại", 130, "controlled"),
         # 5 months ago
-        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Thức ăn thừa từ nhà bếp đổ sát khu chăn nuôi", 155, "contained"),
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe máy nhân viên vào khu bẩn không rửa", 160, "contained"),
+        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Thức ăn thừa từ nhà bếp đổ sát khu chăn nuôi", 155, "controlled"),
+        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe máy nhân viên vào khu bẩn không rửa", 160, "controlled"),
     ]
     for farm_code, area_suffix, def_code, detector, summary, days_ago, status in EVENTS:
         farm = farms.get(farm_code)
@@ -515,7 +525,7 @@ async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users:
             definition_id=defn.id,
             event_at=NOW - timedelta(days=days_ago),
             detected_by_user_id=users[detector].id,
-            source_type="manual", summary=summary, status=status,
+            source_type="field_report", summary=summary, status=status,
         )
         db.add(event)
         events.append(event)

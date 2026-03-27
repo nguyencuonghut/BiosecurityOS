@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -12,6 +13,7 @@ class KillerMetricDefinitionCreate(BaseModel):
     code: str
     name: str
     description: str
+    source_type: Literal["scorecard_item", "field_report", "both"] = "both"
     severity_level: str
     default_case_priority: str
     active_flag: bool = True
@@ -20,6 +22,7 @@ class KillerMetricDefinitionCreate(BaseModel):
 class KillerMetricDefinitionUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    source_type: Literal["scorecard_item", "field_report", "both"] | None = None
     severity_level: str | None = None
     default_case_priority: str | None = None
     active_flag: bool | None = None
@@ -32,6 +35,7 @@ class KillerMetricDefinitionOut(BaseModel):
     code: str
     name: str
     description: str
+    source_type: str
     severity_level: str
     default_case_priority: str
     active_flag: bool
@@ -39,13 +43,30 @@ class KillerMetricDefinitionOut(BaseModel):
 
 # ── Event schemas ──
 
+VALID_EVENT_SOURCE_TYPES = {"assessment", "field_report"}
+VALID_EVENT_STATUSES = {"open", "under_review", "controlled", "closed", "rejected"}
+
+
 class KillerMetricEventCreate(BaseModel):
     farm_id: uuid.UUID
     area_id: uuid.UUID | None = None
     definition_id: uuid.UUID
     event_at: datetime | None = None
     summary: str
-    source_type: str
+    source_type: Literal["assessment", "field_report"]
+    source_assessment_item_result_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_source_consistency(self):
+        if self.source_type == "assessment" and self.source_assessment_item_result_id is None:
+            raise ValueError(
+                "source_assessment_item_result_id bắt buộc khi source_type là 'assessment'."
+            )
+        if self.source_type == "field_report" and self.source_assessment_item_result_id is not None:
+            raise ValueError(
+                "source_assessment_item_result_id phải để trống khi source_type là 'field_report'."
+            )
+        return self
 
 
 class KillerMetricEventUpdate(BaseModel):
@@ -59,6 +80,7 @@ class DefinitionBrief(BaseModel):
 
     code: str
     name: str
+    source_type: str
     severity_level: str
     default_case_priority: str
 
@@ -75,6 +97,7 @@ class KillerMetricEventOut(BaseModel):
     detected_by_user_id: uuid.UUID
     detected_by_name: str | None = None
     source_type: str
+    source_assessment_item_result_id: uuid.UUID | None = None
     summary: str
     status: str
     required_case_flag: bool

@@ -16,6 +16,9 @@ class KillerMetricDefinition(UUIDPrimaryKeyMixin, Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="both"
+    )  # 'scorecard_item' | 'field_report' | 'both'
     severity_level: Mapped[str] = mapped_column(String(20), nullable=False)
     default_case_priority: Mapped[str] = mapped_column(String(20), nullable=False)
     active_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
@@ -41,9 +44,17 @@ class KillerMetricEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     detected_by_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("biosec.app_user.id", ondelete="RESTRICT"), nullable=False
     )
-    source_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_type: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )  # 'assessment' | 'field_report'
+    source_assessment_item_result_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("biosec.assessment_item_result.id", ondelete="SET NULL"),
+    )  # nullable; bắt buộc khi source_type='assessment'
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="open")
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default="open"
+    )  # 'open' | 'under_review' | 'controlled' | 'closed' | 'rejected'
     required_case_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default=text("1")

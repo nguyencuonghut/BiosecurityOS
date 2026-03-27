@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScorecardStore } from '@/stores/scorecard.js'
+import { useKillerMetricStore } from '@/stores/killerMetric.js'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
@@ -21,6 +22,7 @@ import * as scorecardService from '@/services/scorecardService.js'
 const route = useRoute()
 const router = useRouter()
 const store = useScorecardStore()
+const kmStore = useKillerMetricStore()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -54,12 +56,13 @@ const activeSection = ref(null)
 const editingItemId = ref(null)
 const itemForm = ref({
   code: '', question_text: '', response_type: null, max_score: 5,
-  weight: 1, is_killer_related: false, threshold_warning: null,
+  weight: 1, killer_metric_definition_id: null, threshold_warning: null,
   threshold_fail: null, guidance_text: '', display_order: 1,
 })
 
 onMounted(async () => {
   await store.fetchTemplate(templateId.value)
+  await kmStore.fetchDefinitions()
 })
 
 // ── Template actions ──
@@ -113,7 +116,7 @@ function openAddItem(section) {
   editingItemId.value = null
   itemForm.value = {
     code: '', question_text: '', response_type: null, max_score: 5,
-    weight: 1, is_killer_related: false, threshold_warning: null,
+    weight: 1, killer_metric_definition_id: null, threshold_warning: null,
     threshold_fail: null, guidance_text: '', display_order: (section.items?.length || 0) + 1,
   }
   showItemDialog.value = true
@@ -124,7 +127,8 @@ function openEditItem(section, item) {
   editingItemId.value = item.id
   itemForm.value = {
     code: item.code, question_text: item.question_text, response_type: item.response_type,
-    max_score: Number(item.max_score), weight: Number(item.weight), is_killer_related: item.is_killer_related,
+    max_score: Number(item.max_score), weight: Number(item.weight),
+    killer_metric_definition_id: item.killer_metric_definition_id || null,
     threshold_warning: item.threshold_warning != null ? Number(item.threshold_warning) : null,
     threshold_fail: item.threshold_fail != null ? Number(item.threshold_fail) : null,
     guidance_text: item.guidance_text || '', display_order: item.display_order,
@@ -198,7 +202,7 @@ async function handleClone() {
           response_type: item.response_type,
           max_score: Number(item.max_score),
           weight: Number(item.weight),
-          is_killer_related: item.is_killer_related,
+          killer_metric_definition_id: item.killer_metric_definition_id || null,
           threshold_warning: item.threshold_warning != null ? Number(item.threshold_warning) : null,
           threshold_fail: item.threshold_fail != null ? Number(item.threshold_fail) : null,
           guidance_text: item.guidance_text || '',
@@ -361,8 +365,16 @@ async function handleClone() {
           <Textarea v-model="itemForm.guidance_text" rows="2" class="w-full" />
         </div>
         <div class="field">
-          <Checkbox v-model="itemForm.is_killer_related" :binary="true" inputId="killer" />
-          <label for="killer" class="ml-2">Liên quan Killer Metric</label>
+          <label>Killer Metric liên kết</label>
+          <Select
+            v-model="itemForm.killer_metric_definition_id"
+            :options="kmStore.definitions"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Không liên kết"
+            showClear
+            class="w-full"
+          />
         </div>
       </div>
       <template #footer>

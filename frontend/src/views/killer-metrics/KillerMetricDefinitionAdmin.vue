@@ -32,8 +32,24 @@ const priorityOptions = [
   { label: 'P2', value: 'P2' },
 ]
 
+const sourceTypeOptions = [
+  { label: 'Từ scorecard item', value: 'scorecard_item' },
+  { label: 'Từ báo cáo thực địa', value: 'field_report' },
+  { label: 'Cả hai nguồn', value: 'both' },
+]
+
+function sourceTypeLabel(val) {
+  const m = { scorecard_item: 'Scorecard Item', field_report: 'Báo cáo thực địa', both: 'Cả hai' }
+  return m[val] || val
+}
+
+function sourceTypeColor(val) {
+  const m = { scorecard_item: 'info', field_report: 'warn', both: 'success' }
+  return m[val] || 'secondary'
+}
+
 function emptyForm() {
-  return { code: '', name: '', description: '', severity_level: 'critical', default_case_priority: 'P0', active_flag: true }
+  return { code: '', name: '', description: '', severity_level: 'critical', default_case_priority: 'P0', active_flag: true, source_type: 'both' }
 }
 
 function severityColor(level) {
@@ -56,6 +72,7 @@ function openEdit(row) {
     severity_level: row.severity_level,
     default_case_priority: row.default_case_priority,
     active_flag: row.active_flag,
+    source_type: row.source_type || 'both',
   }
   showDialog.value = true
 }
@@ -69,6 +86,7 @@ async function save() {
         severity_level: form.value.severity_level,
         default_case_priority: form.value.default_case_priority,
         active_flag: form.value.active_flag,
+        source_type: form.value.source_type,
       })
       toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã cập nhật định nghĩa', life: 3000 })
     } else {
@@ -118,6 +136,11 @@ onMounted(() => store.fetchDefinitions())
           <Tag :value="data.default_case_priority" severity="contrast" />
         </template>
       </Column>
+      <Column field="source_type" header="Nguồn" style="width: 160px">
+        <template #body="{ data }">
+          <Tag :value="sourceTypeLabel(data.source_type)" :severity="sourceTypeColor(data.source_type)" />
+        </template>
+      </Column>
       <Column field="active_flag" header="Trạng thái" style="width: 110px">
         <template #body="{ data }">
           <Tag :value="data.active_flag ? 'Active' : 'Inactive'" :severity="data.active_flag ? 'success' : 'secondary'" />
@@ -162,6 +185,10 @@ onMounted(() => store.fetchDefinitions())
             <label>Ưu tiên mặc định</label>
             <Select v-model="form.default_case_priority" :options="priorityOptions" optionLabel="label" optionValue="value" class="w-full" />
           </div>
+        </div>
+        <div class="form-field">
+          <label>Nguồn kích hoạt</label>
+          <Select v-model="form.source_type" :options="sourceTypeOptions" optionLabel="label" optionValue="value" class="w-full" />
         </div>
         <div class="form-field" v-if="editing">
           <label>Active</label>

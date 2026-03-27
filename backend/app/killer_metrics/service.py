@@ -23,10 +23,10 @@ from app.shared.optimistic_lock import apply_version_update, check_version
 
 # ── Valid transitions for killer event state machine (B04.7) ──
 VALID_TRANSITIONS: dict[str, list[str]] = {
-    "open": ["under_review"],
-    "under_review": ["contained", "open"],
-    "contained": ["closed", "under_review"],
-    # "closed" is terminal — DB trigger enforces case existence
+    "open": ["under_review", "rejected"],
+    "under_review": ["controlled", "open", "rejected"],
+    "controlled": ["closed", "under_review"],
+    # "closed" and "rejected" are terminal
 }
 
 
@@ -36,6 +36,7 @@ VALID_TRANSITIONS: dict[str, list[str]] = {
 
 VALID_SEVERITY = {"low", "medium", "high", "critical"}
 VALID_PRIORITY = {"P0", "P1", "P2", "P3"}
+VALID_DEFINITION_SOURCE_TYPES = {"scorecard_item", "field_report", "both"}
 
 
 async def list_definitions(db: AsyncSession) -> list[KillerMetricDefinition]:
@@ -60,6 +61,8 @@ async def create_definition(
 ) -> KillerMetricDefinition:
     _validate_severity(data.severity_level)
     _validate_priority(data.default_case_priority)
+    if hasattr(data, "source_type") and data.source_type:
+        _validate_definition_source_type(data.source_type)
 
     # Check unique code
     existing = await db.execute(
@@ -154,6 +157,7 @@ async def create_event(
         event_at=data.event_at or func.now(),
         detected_by_user_id=detected_by_user_id,
         source_type=data.source_type,
+        source_assessment_item_result_id=data.source_assessment_item_result_id,
         summary=data.summary,
         status="open",
         required_case_flag=True,
@@ -319,6 +323,11 @@ def _validate_severity(value: str) -> None:
 def _validate_priority(value: str) -> None:
     if value not in VALID_PRIORITY:
         raise AppException(422, "INVALID_PRIORITY", f"default_case_priority phải là: {', '.join(sorted(VALID_PRIORITY))}")
+
+
+def _validate_definition_source_type(value: str) -> None:
+    if value not in VALID_DEFINITION_SOURCE_TYPES:
+        raise AppException(422, "INVALID_SOURCE_TYPE", f"source_type phải là: {', '.join(sorted(VALID_DEFINITION_SOURCE_TYPES))}")
 
 
 def _validate_transition(current: str, target: str) -> None:

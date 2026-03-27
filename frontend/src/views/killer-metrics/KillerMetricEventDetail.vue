@@ -45,16 +45,18 @@ const breadcrumbItems = computed(() => [
 const breadcrumbHome = { icon: 'pi pi-bolt', command: () => router.push('/killer-metrics/events') }
 
 // ── Status pipeline ──
-const STATUS_PIPELINE = ['open', 'under_review', 'contained', 'closed']
+const STATUS_PIPELINE = ['open', 'under_review', 'controlled', 'closed']
 const statusStepIndex = computed(() => {
   if (!event.value) return -1
-  return STATUS_PIPELINE.indexOf(event.value.status)
+  const s = event.value.status
+  // rejected không nằm trong pipeline — được hiển thị riêng
+  return STATUS_PIPELINE.indexOf(s)
 })
 
 const VALID_TRANSITIONS = {
-  open: ['under_review'],
-  under_review: ['contained', 'open'],
-  contained: ['closed', 'under_review'],
+  open: ['under_review', 'rejected'],
+  under_review: ['controlled', 'open', 'rejected'],
+  controlled: ['closed', 'under_review'],
 }
 
 function nextActions(status) {
@@ -163,11 +165,11 @@ async function deleteEvidence(att) {
 
 // ── Helpers ──
 function statusColor(status) {
-  const m = { open: 'danger', under_review: 'warn', contained: 'info', closed: 'success' }
+  const m = { open: 'danger', under_review: 'warn', controlled: 'info', closed: 'success', rejected: 'secondary' }
   return m[status] || 'secondary'
 }
 function statusLabel(status) {
-  const m = { open: 'Open', under_review: 'Đang xem xét', contained: 'Đã kiểm soát', closed: 'Đã đóng' }
+  const m = { open: 'Mới phát hiện', under_review: 'Đang xem xét', controlled: 'Đã kiểm soát', closed: 'Đã đóng', rejected: 'Bác bỏ' }
   return m[status] || status
 }
 function severityColor(level) {
@@ -175,7 +177,7 @@ function severityColor(level) {
   return m[level] || 'secondary'
 }
 function sourceLabel(s) {
-  const m = { field_report: 'Báo cáo thực địa', camera: 'Camera giám sát', assessment: 'Đánh giá', other: 'Khác' }
+  const m = { field_report: 'Báo cáo thực địa', assessment: 'Đánh giá / Audit' }
   return m[s] || s
 }
 function formatDate(d) {
@@ -243,7 +245,7 @@ onMounted(async () => {
             <Tag :value="event.definition?.code" severity="secondary" v-if="event.definition?.code" />
           </div>
         </div>
-        <div class="header-actions" v-if="authStore.hasPermission('KILLER_EVENT_WRITE') && event.status !== 'closed'">
+        <div class="header-actions" v-if="authStore.hasPermission('KILLER_EVENT_WRITE') && event.status !== 'closed' && event.status !== 'rejected'">
           <Button
             v-for="target in nextActions(event.status)"
             :key="target"
@@ -258,7 +260,11 @@ onMounted(async () => {
 
       <!-- Status Pipeline -->
       <div class="pipeline-wrap">
-        <Stepper :value="statusStepIndex" linear class="event-stepper">
+        <div v-if="event.status === 'rejected'" class="rejected-banner">
+          <Tag severity="secondary" value="Bác bỏ" icon="pi pi-ban" style="font-size:1rem;padding:.5rem 1.2rem" />
+          <span class="rejected-note">Sự kiện này đã bị bác bỏ và không đi theo luồng xử lý thông thường.</span>
+        </div>
+        <Stepper v-else :value="statusStepIndex" linear class="event-stepper">
           <StepList>
             <Step v-for="(step, idx) in STATUS_PIPELINE" :key="step" :value="idx">
               {{ statusLabel(step) }}

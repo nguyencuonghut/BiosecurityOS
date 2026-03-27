@@ -22,10 +22,11 @@ const authStore = useAuthStore()
 
 const statusOptions = [
   { label: 'Tất cả', value: null },
-  { label: 'Open', value: 'open' },
-  { label: 'Under Review', value: 'under_review' },
-  { label: 'Contained', value: 'contained' },
-  { label: 'Closed', value: 'closed' },
+  { label: 'Mới phát hiện', value: 'open' },
+  { label: 'Đang xem xét', value: 'under_review' },
+  { label: 'Đã kiểm soát', value: 'controlled' },
+  { label: 'Đã đóng', value: 'closed' },
+  { label: 'Bác bỏ', value: 'rejected' },
 ]
 
 const farmOptions = computed(() => [
@@ -44,9 +45,7 @@ const createForm = ref({ farm_id: null, definition_id: null, summary: '', source
 
 const sourceOptions = [
   { label: 'Báo cáo thực địa', value: 'field_report' },
-  { label: 'Camera giám sát', value: 'camera' },
-  { label: 'Đánh giá', value: 'assessment' },
-  { label: 'Khác', value: 'other' },
+  { label: 'Đánh giá / Audit', value: 'assessment' },
 ]
 
 // ── Status transition dialog ──
@@ -55,18 +54,18 @@ const transitionEvent = ref(null)
 const transitionTarget = ref(null)
 
 const VALID_TRANSITIONS = {
-  open: ['under_review'],
-  under_review: ['contained', 'open'],
-  contained: ['closed', 'under_review'],
+  open: ['under_review', 'rejected'],
+  under_review: ['controlled', 'open', 'rejected'],
+  controlled: ['closed', 'under_review'],
 }
 
 function statusColor(status) {
-  const m = { open: 'danger', under_review: 'warn', contained: 'info', closed: 'success' }
+  const m = { open: 'danger', under_review: 'warn', controlled: 'info', closed: 'success', rejected: 'secondary' }
   return m[status] || 'secondary'
 }
 
 function statusLabel(status) {
-  const m = { open: 'Open', under_review: 'Đang xem xét', contained: 'Đã kiểm soát', closed: 'Đã đóng' }
+  const m = { open: 'Mới phát hiện', under_review: 'Đang xem xét', controlled: 'Đã kiểm soát', closed: 'Đã đóng', rejected: 'Bác bỏ' }
   return m[status] || status
 }
 
@@ -245,7 +244,7 @@ onMounted(async () => {
               v-tooltip.top="'Chi tiết'"
               @click="router.push(`/killer-metrics/events/${data.id}`)"
             />
-            <template v-if="data.status !== 'closed'">
+            <template v-if="data.status !== 'closed' && data.status !== 'rejected'">
               <Button
                 v-for="target in nextActions(data.status)"
                 :key="target"
@@ -256,7 +255,7 @@ onMounted(async () => {
                 @click="openTransition(data, target)"
               />
             </template>
-            <Tag v-else value="Đã đóng" severity="success" />
+            <Tag v-else :value="statusLabel(data.status)" :severity="statusColor(data.status)" />
           </div>
         </template>
       </Column>

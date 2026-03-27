@@ -254,12 +254,13 @@ SET name = EXCLUDED.name,
     note = EXCLUDED.note;
 
 -- 5) Định nghĩa killer metric mẫu
-INSERT INTO biosec.killer_metric_definition (code, name, description, severity_level, default_case_priority, active_flag)
+INSERT INTO biosec.killer_metric_definition (code, name, description, source_type, severity_level, default_case_priority, active_flag)
 VALUES
     (
         'SWILL_FEED',
         'Thức ăn thừa / thực phẩm lạ',
         'Phát hiện sử dụng thức ăn thừa, thực phẩm lạ hoặc nguồn thức ăn không kiểm soát cho đàn heo.',
+        'both',
         'critical',
         'P0',
         true
@@ -268,6 +269,7 @@ VALUES
         'RED_LINE_BREACH',
         'Vi phạm vạch đỏ / ranh giới sạch-bẩn',
         'Có người, vật tư hoặc thiết bị đi sai tuyến và vượt qua ranh giới sạch-bẩn không đúng quy trình.',
+        'scorecard_item',
         'critical',
         'P0',
         true
@@ -276,6 +278,7 @@ VALUES
         'DEAD_PIG_PROTOCOL_BREACH',
         'Sai quy trình xử lý heo chết',
         'Việc gom, vận chuyển hoặc tiêu hủy heo chết không tuân thủ SOP và có nguy cơ phát tán mầm bệnh.',
+        'both',
         'critical',
         'P0',
         true
@@ -284,6 +287,7 @@ VALUES
         'UNKNOWN_VISITOR',
         'Người lạ / nhà thầu không kiểm soát',
         'Có khách, nhà thầu hoặc tài xế vào khu vực trại khi chưa được kiểm soát ATSH đầy đủ.',
+        'field_report',
         'high',
         'P1',
         true
@@ -291,6 +295,7 @@ VALUES
 ON CONFLICT (code) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description,
+    source_type = EXCLUDED.source_type,
     severity_level = EXCLUDED.severity_level,
     default_case_priority = EXCLUDED.default_case_priority,
     active_flag = EXCLUDED.active_flag;

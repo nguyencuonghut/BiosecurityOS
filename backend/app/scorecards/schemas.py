@@ -15,7 +15,7 @@ class ScorecardItemCreate(BaseModel):
     response_type: str = Field(pattern=r"^(yes_no|score_0_5|option|numeric|text)$")
     max_score: Decimal = Field(ge=0)
     weight: Decimal = Field(ge=0)
-    is_killer_related: bool = False
+    killer_metric_definition_id: uuid.UUID | None = None
     threshold_warning: Decimal | None = Field(default=None, ge=0)
     threshold_fail: Decimal | None = Field(default=None, ge=0)
     guidance_text: str | None = None
@@ -28,7 +28,7 @@ class ScorecardItemUpdate(BaseModel):
     response_type: str | None = Field(default=None, pattern=r"^(yes_no|score_0_5|option|numeric|text)$")
     max_score: Decimal | None = Field(default=None, ge=0)
     weight: Decimal | None = Field(default=None, ge=0)
-    is_killer_related: bool | None = None
+    killer_metric_definition_id: uuid.UUID | None = None
     threshold_warning: Decimal | None = Field(default=None, ge=0)
     threshold_fail: Decimal | None = Field(default=None, ge=0)
     guidance_text: str | None = None
@@ -45,6 +45,7 @@ class ScorecardItemOut(BaseModel):
     response_type: str
     max_score: Decimal
     weight: Decimal
+    killer_metric_definition_id: uuid.UUID | None
     is_killer_related: bool
     threshold_warning: Decimal | None
     threshold_fail: Decimal | None

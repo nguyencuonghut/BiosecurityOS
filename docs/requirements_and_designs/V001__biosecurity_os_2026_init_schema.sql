@@ -304,7 +304,8 @@ CREATE TABLE biosec.scorecard_item (
     response_type varchar(30) NOT NULL,
     max_score numeric(8,2) NOT NULL,
     weight numeric(8,2) NOT NULL,
-    is_killer_related boolean DEFAULT false NOT NULL,
+    killer_metric_definition_id uuid,  -- FK nullable → killer_metric_definition
+    is_killer_related boolean GENERATED ALWAYS AS (killer_metric_definition_id IS NOT NULL) STORED,
     threshold_warning numeric(8,2),
     threshold_fail numeric(8,2),
     guidance_text text,
@@ -379,11 +380,13 @@ CREATE TABLE biosec.killer_metric_definition (
     code varchar(50) NOT NULL,
     name varchar(255) NOT NULL,
     description text NOT NULL,
+    source_type varchar(30) NOT NULL DEFAULT 'both',  -- 'scorecard_item' | 'field_report' | 'both'
     severity_level varchar(20) NOT NULL,
     default_case_priority varchar(20) NOT NULL,
     active_flag boolean DEFAULT true NOT NULL,
     CONSTRAINT ck_killer_metric_definition_1 CHECK (severity_level IN ('low','medium','high','critical')),
-    CONSTRAINT ck_killer_metric_definition_2 CHECK (default_case_priority IN ('P0','P1','P2','P3'))
+    CONSTRAINT ck_killer_metric_definition_2 CHECK (default_case_priority IN ('P0','P1','P2','P3')),
+    CONSTRAINT ck_killer_metric_definition_3 CHECK (source_type IN ('scorecard_item','field_report','both'))
 );
 
 -- killer_metric_event
@@ -394,14 +397,21 @@ CREATE TABLE biosec.killer_metric_event (
     definition_id uuid NOT NULL,
     event_at timestamptz DEFAULT now() NOT NULL,
     detected_by_user_id uuid NOT NULL,
-    source_type varchar(30) NOT NULL,
+    source_type varchar(30) NOT NULL,  -- 'assessment' | 'field_report'
+    source_assessment_item_result_id uuid,  -- nullable FK → assessment_item_result; bắt buộc khi source_type='assessment'
     summary text NOT NULL,
     status varchar(30) DEFAULT 'open' NOT NULL,
     required_case_flag boolean DEFAULT true NOT NULL,
     version integer DEFAULT 1 NOT NULL,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
-    CONSTRAINT ck_killer_metric_event_1 CHECK (status IN ('open','under_review','contained','closed'))
+    CONSTRAINT ck_killer_metric_event_1 CHECK (status IN ('open','under_review','controlled','closed','rejected')),
+    CONSTRAINT ck_killer_metric_event_2 CHECK (source_type IN ('assessment','field_report')),
+    CONSTRAINT ck_killer_metric_event_3 CHECK (
+        (source_type = 'assessment' AND source_assessment_item_result_id IS NOT NULL)
+        OR
+        (source_type = 'field_report' AND source_assessment_item_result_id IS NULL)
+    )
 );
 
 -- trust_score_snapshot
@@ -1173,6 +1183,7 @@ ALTER TABLE biosec.floorplan_marker ADD CONSTRAINT fk_floorplan_marker_area_id F
 ALTER TABLE biosec.external_risk_point ADD CONSTRAINT fk_external_risk_point_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE CASCADE;
 ALTER TABLE biosec.scorecard_section ADD CONSTRAINT fk_scorecard_section_template_id FOREIGN KEY (template_id) REFERENCES biosec.scorecard_template(id) ON DELETE CASCADE;
 ALTER TABLE biosec.scorecard_item ADD CONSTRAINT fk_scorecard_item_section_id FOREIGN KEY (section_id) REFERENCES biosec.scorecard_section(id) ON DELETE CASCADE;
+ALTER TABLE biosec.scorecard_item ADD CONSTRAINT fk_scorecard_item_killer_metric_definition_id FOREIGN KEY (killer_metric_definition_id) REFERENCES biosec.killer_metric_definition(id) ON DELETE SET NULL;
 ALTER TABLE biosec.assessment ADD CONSTRAINT fk_assessment_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.assessment ADD CONSTRAINT fk_assessment_template_id FOREIGN KEY (template_id) REFERENCES biosec.scorecard_template(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.assessment ADD CONSTRAINT fk_assessment_performed_by_user_id FOREIGN KEY (performed_by_user_id) REFERENCES biosec.app_user(id) ON DELETE RESTRICT;
@@ -1187,6 +1198,7 @@ ALTER TABLE biosec.killer_metric_event ADD CONSTRAINT fk_killer_metric_event_far
 ALTER TABLE biosec.killer_metric_event ADD CONSTRAINT fk_killer_metric_event_area_id FOREIGN KEY (area_id) REFERENCES biosec.farm_area(id) ON DELETE SET NULL;
 ALTER TABLE biosec.killer_metric_event ADD CONSTRAINT fk_killer_metric_event_definition_id FOREIGN KEY (definition_id) REFERENCES biosec.killer_metric_definition(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.killer_metric_event ADD CONSTRAINT fk_killer_metric_event_detected_by_user_id FOREIGN KEY (detected_by_user_id) REFERENCES biosec.app_user(id) ON DELETE RESTRICT;
+ALTER TABLE biosec.killer_metric_event ADD CONSTRAINT fk_killer_metric_event_source_assessment_item_result_id FOREIGN KEY (source_assessment_item_result_id) REFERENCES biosec.assessment_item_result(id) ON DELETE SET NULL;
 ALTER TABLE biosec.trust_score_snapshot ADD CONSTRAINT fk_trust_score_snapshot_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.trust_score_snapshot ADD CONSTRAINT fk_trust_score_snapshot_source_self_assessment_id FOREIGN KEY (source_self_assessment_id) REFERENCES biosec.assessment(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.trust_score_snapshot ADD CONSTRAINT fk_trust_score_snapshot_source_audit_assessment_id FOREIGN KEY (source_audit_assessment_id) REFERENCES biosec.assessment(id) ON DELETE RESTRICT;
