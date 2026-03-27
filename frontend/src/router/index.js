@@ -42,6 +42,12 @@ const routes = [
         meta: { permission: 'USER_ADMIN' },
       },
       {
+        path: 'admin/roles',
+        name: 'RoleManagement',
+        component: () => import('@/views/admin/RoleManagementView.vue'),
+        meta: { permission: 'USER_ADMIN' },
+      },
+      {
         path: 'scorecards',
         name: 'Scorecards',
         component: () => import('@/views/scorecards/ScorecardListView.vue'),

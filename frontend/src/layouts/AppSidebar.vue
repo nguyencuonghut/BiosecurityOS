@@ -23,7 +23,8 @@ const menuItems = computed(() => {
     { label: 'Bài học', icon: 'pi pi-book', to: '/lessons', permission: 'LESSON_READ' },
     { label: 'Báo cáo', icon: 'pi pi-file-export', to: '/reports', permission: 'REPORT_GENERATE' },
     { label: 'Thông báo', icon: 'pi pi-bell', to: '/notifications', permission: 'NOTIFICATION_READ' },
-    { label: 'Admin', icon: 'pi pi-cog', to: '/admin/users', permission: 'USER_ADMIN' },
+    { label: 'Người dùng', icon: 'pi pi-users', to: '/admin/users', permission: 'USER_ADMIN' },
+    { label: 'Phân quyền', icon: 'pi pi-shield', to: '/admin/roles', permission: 'USER_ADMIN' },
     { label: 'KM Definitions', icon: 'pi pi-exclamation-circle', to: '/killer-metrics/definitions', permission: 'KILLER_EVENT_WRITE' },
     { label: 'Nhật ký', icon: 'pi pi-history', to: '/admin/audit-logs', permission: 'AUDIT_LOG_READ' },
   ]

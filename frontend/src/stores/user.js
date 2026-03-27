@@ -10,6 +10,11 @@ export const useUserStore = defineStore('user', () => {
 
   const currentUser = ref(null)
 
+  // ── Role & Permission state ────────────────────────────────
+  const roles = ref([])           // all roles (with permission_ids loaded)
+  const permissions = ref([])     // all permissions (reference)
+  const selectedRole = ref(null)  // currently selected role for the permission matrix
+
   async function fetchUsers() {
     loading.value = true
     try {
@@ -47,9 +52,50 @@ export const useUserStore = defineStore('user', () => {
     await userService.removeRole(userId, userRoleId)
   }
 
+  // ── Role Management ─────────────────────────────────────────
+
+  async function fetchRoles() {
+    const data = await userService.listRoles()
+    roles.value = data
+  }
+
+  async function fetchRoleDetail(roleId) {
+    const data = await userService.getRole(roleId)
+    selectedRole.value = data
+    return data
+  }
+
+  async function fetchPermissions() {
+    const data = await userService.listPermissions()
+    permissions.value = data
+  }
+
+  async function grantPermission(roleId, permissionId) {
+    await userService.assignPermissionToRole(roleId, permissionId)
+    // Update local state immediately (optimistic)
+    if (selectedRole.value && selectedRole.value.id === roleId) {
+      if (!selectedRole.value.permission_ids.includes(permissionId)) {
+        selectedRole.value.permission_ids.push(permissionId)
+      }
+    }
+  }
+
+  async function revokePermission(roleId, permissionId) {
+    await userService.revokePermissionFromRole(roleId, permissionId)
+    // Update local state immediately (optimistic)
+    if (selectedRole.value && selectedRole.value.id === roleId) {
+      selectedRole.value.permission_ids = selectedRole.value.permission_ids.filter(
+        (id) => id !== permissionId
+      )
+    }
+  }
+
   return {
     users, totalRecords, loading, filters,
     currentUser,
+    roles, permissions, selectedRole,
     fetchUsers, fetchUser, saveUser, assignRole, removeRole,
+    fetchRoles, fetchRoleDetail, fetchPermissions, grantPermission, revokePermission,
   }
 })
+

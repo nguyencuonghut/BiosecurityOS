@@ -11,12 +11,22 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import Card from 'primevue/card'
+import { useLayout } from '@/layouts/composables/layout.js'
 
 use([BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
 })
+
+const { layoutState } = useLayout()
+
+// Reactive text/axis color that follows dark mode
+const textColor    = computed(() => layoutState.darkMode ? '#e2e8f0' : '#374151')
+const mutedColor   = computed(() => layoutState.darkMode ? '#94a3b8' : '#6b7280')
+const borderColor  = computed(() => layoutState.darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)')
+const tooltipBg    = computed(() => layoutState.darkMode ? '#1e293b' : '#ffffff')
+const tooltipBorder= computed(() => layoutState.darkMode ? '#334155' : '#e5e7eb')
 
 const option = computed(() => {
   if (!props.data.length) return {}
@@ -39,13 +49,21 @@ const option = computed(() => {
   }))
 
   return {
+    backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
+      backgroundColor: tooltipBg.value,
+      borderColor: tooltipBorder.value,
+      textStyle: { color: textColor.value },
     },
     legend: {
       bottom: 0,
       type: 'scroll',
+      textStyle: { color: textColor.value },
+      pageTextStyle: { color: mutedColor.value },
+      pageIconColor: textColor.value,
+      pageIconInactiveColor: mutedColor.value,
     },
     grid: {
       left: '3%',
@@ -59,10 +77,16 @@ const option = computed(() => {
         const d = new Date(m)
         return `${d.getMonth() + 1}/${d.getFullYear()}`
       }),
+      axisLine:  { lineStyle: { color: borderColor.value } },
+      axisTick:  { lineStyle: { color: borderColor.value } },
+      axisLabel: { color: mutedColor.value },
     },
     yAxis: {
       type: 'value',
       name: 'Số sự kiện',
+      nameTextStyle: { color: mutedColor.value },
+      axisLabel: { color: mutedColor.value },
+      splitLine: { lineStyle: { color: borderColor.value } },
     },
     series,
   }

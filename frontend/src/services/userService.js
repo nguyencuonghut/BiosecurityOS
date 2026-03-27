@@ -29,7 +29,30 @@ export async function listRoles() {
   return data.data
 }
 
-// ── Role assignment ────────────────────────────────────────────
+export async function getRole(roleId) {
+  const { data } = await apiClient.get(`/users/roles/${roleId}`)
+  return data.data // { id, code, name, scope_type, description, permission_ids: [...] }
+}
+
+// ── Permissions (reference data) ──────────────────────────────
+
+export async function listPermissions() {
+  const { data } = await apiClient.get('/users/permissions')
+  return data.data // [{ id, code, name, module, action }, ...]
+}
+
+// ── Role-Permission assignment ─────────────────────────────────
+
+export async function assignPermissionToRole(roleId, permissionId) {
+  const { data } = await apiClient.post(`/users/roles/${roleId}/permissions/${permissionId}`)
+  return data.data
+}
+
+export async function revokePermissionFromRole(roleId, permissionId) {
+  await apiClient.delete(`/users/roles/${roleId}/permissions/${permissionId}`)
+}
+
+// ── Role assignment (user ↔ role) ──────────────────────────────
 
 export async function assignRole(userId, payload) {
   const { data } = await apiClient.post(`/users/${userId}/roles`, payload)
@@ -39,3 +62,4 @@ export async function assignRole(userId, payload) {
 export async function removeRole(userId, userRoleId) {
   await apiClient.delete(`/users/${userId}/roles/${userRoleId}`)
 }
+

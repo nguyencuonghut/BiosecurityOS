@@ -1,4 +1,4 @@
-"""User API router — CRUD users + role assignment (B02.1, B02.2)."""
+"""User API router — CRUD users + role assignment + permission management (B02.1, B02.2)."""
 
 import uuid
 from typing import Annotated
@@ -83,6 +83,76 @@ async def create_user(
     return success_response(request, _user_to_dict(user), status_code=201)
 
 
+# ── Permission management endpoints (must be before /{user_id}) ──
+
+@router.get("/permissions")
+async def list_permissions(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    """Return all system permissions grouped by module."""
+    perms = await service.list_permissions(db)
+    data = [
+        {
+            "id": str(p.id),
+            "code": p.code,
+            "name": p.name,
+            "module": p.module,
+            "action": p.action,
+        }
+        for p in perms
+    ]
+    return success_response(request, data)
+
+
+@router.get("/roles/{role_id}")
+async def get_role(
+    request: Request,
+    role_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    """Return a role with its full permission list."""
+    role = await service.get_role(db, uuid.UUID(role_id))
+    perm_ids = [str(rp.permission_id) for rp in role.role_permissions]
+    data = {
+        "id": str(role.id),
+        "code": role.code,
+        "name": role.name,
+        "scope_type": role.scope_type,
+        "description": role.description,
+        "permission_ids": perm_ids,
+    }
+    return success_response(request, data)
+
+
+@router.post("/roles/{role_id}/permissions/{permission_id}", status_code=201)
+async def assign_permission(
+    request: Request,
+    role_id: str,
+    permission_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    """Grant a permission to a role."""
+    await service.assign_permission_to_role(db, uuid.UUID(role_id), uuid.UUID(permission_id))
+    return success_response(request, {"role_id": role_id, "permission_id": permission_id}, status_code=201)
+
+
+@router.delete("/roles/{role_id}/permissions/{permission_id}", status_code=204)
+async def revoke_permission(
+    role_id: str,
+    permission_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    """Revoke a permission from a role."""
+    await service.remove_permission_from_role(db, uuid.UUID(role_id), uuid.UUID(permission_id))
+
+
+# ── User CRUD ────────────────────────────────────────────────────
+
 @router.get("/{user_id}")
 async def get_user(
     request: Request,
@@ -127,3 +197,4 @@ async def remove_role(
     _: Annotated[None, require_permission("USER_ADMIN")],
 ):
     await service.remove_role(db, uuid.UUID(user_id), uuid.UUID(user_role_id))
+
