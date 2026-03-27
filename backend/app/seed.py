@@ -270,29 +270,29 @@ SCORECARD_SECTIONS = [
 
 ITEMS_PER_SECTION = {
     "HW": [
-        ("Hàng rào bao quanh trại nguyên vẹn", "yes_no", 10, False),
-        ("Cổng ra vào có khóa & kiểm soát", "yes_no", 10, False),
-        ("Khu cách ly đúng quy cách", "score_0_5", 10, False),
-        ("Hệ thống sát trùng xe tải hoạt động", "yes_no", 10, True),
-        ("Kho chứa cám cách ly đúng cách", "score_0_5", 10, False),
+        ("Hàng rào bao quanh trại nguyên vẹn", "yes_no", 10, None),
+        ("Cổng ra vào có khóa & kiểm soát", "yes_no", 10, None),
+        ("Khu cách ly đúng quy cách", "score_0_5", 10, None),
+        ("Hệ thống sát trùng xe tải hoạt động", "yes_no", 10, "RED_LINE_BREACH"),
+        ("Kho chứa cám cách ly đúng cách", "score_0_5", 10, None),
     ],
     "PR": [
-        ("SOP tiếp nhận heo mới", "yes_no", 10, False),
-        ("SOP xử lý heo chết", "yes_no", 10, True),
-        ("Lịch sát trùng định kỳ", "score_0_5", 10, False),
-        ("Quy trình kiểm tra sức khỏe hàng ngày", "score_0_5", 10, False),
-        ("SOP quản lý khách/xe ra vào", "yes_no", 10, False),
+        ("SOP tiếp nhận heo mới", "yes_no", 10, None),
+        ("SOP xử lý heo chết", "yes_no", 10, "DEAD_PIG_PROTOCOL_BREACH"),
+        ("Lịch sát trùng định kỳ", "score_0_5", 10, None),
+        ("Quy trình kiểm tra sức khỏe hàng ngày", "score_0_5", 10, None),
+        ("SOP quản lý khách/xe ra vào", "yes_no", 10, "UNKNOWN_VISITOR"),
     ],
     "BH": [
-        ("Nhân viên thay đồ trước khi vào khu sạch", "yes_no", 10, False),
-        ("Tắm sát trùng trước khi vào chuồng", "yes_no", 10, True),
-        ("Không mang thức ăn bên ngoài vào trại", "yes_no", 10, True),
-        ("Ghi chép đầy đủ sổ theo dõi ATSH", "score_0_5", 10, False),
+        ("Nhân viên thay đồ trước khi vào khu sạch", "yes_no", 10, None),
+        ("Tắm sát trùng trước khi vào chuồng", "yes_no", 10, "RED_LINE_BREACH"),
+        ("Không mang thức ăn bên ngoài vào trại", "yes_no", 10, "SWILL_FEED"),
+        ("Ghi chép đầy đủ sổ theo dõi ATSH", "score_0_5", 10, None),
     ],
     "MN": [
-        ("Camera giám sát hoạt động 24/7", "yes_no", 10, False),
-        ("Hệ thống cảnh báo nhiệt độ/ẩm độ", "score_0_5", 10, False),
-        ("Báo cáo ATSH hàng tuần", "yes_no", 10, False),
+        ("Camera giám sát hoạt động 24/7", "yes_no", 10, None),
+        ("Hệ thống cảnh báo nhiệt độ/ẩm độ", "score_0_5", 10, None),
+        ("Báo cáo ATSH hàng tuần", "yes_no", 10, None),
     ],
 }
 
@@ -304,8 +304,6 @@ async def _seed_scorecards(db: AsyncSession) -> dict:
     from app.killer_metrics.models import KillerMetricDefinition as KMDef
     km_result = await db.execute(select(KMDef))
     km_defs = {d.code: d for d in km_result.scalars().all()}
-    # Map is_killer flag → a relevant definition (use first active one as fallback)
-    fallback_km = next(iter(km_defs.values()), None)
 
     TEMPLATES = [
         ("SC-SOW-V1", "Scorecard ATSH — Trại nái", "sow", 1),
@@ -335,13 +333,13 @@ async def _seed_scorecards(db: AsyncSession) -> dict:
             db.add(section)
             await db.flush()
 
-            for idx, (q_text, resp_type, max_score, is_killer) in enumerate(ITEMS_PER_SECTION.get(s_suffix, []), 1):
-                km_def_id = fallback_km.id if is_killer and fallback_km else None
+            for idx, (q_text, resp_type, max_score, km_code) in enumerate(ITEMS_PER_SECTION.get(s_suffix, []), 1):
+                km_def = km_defs.get(km_code) if km_code else None
                 db.add(ScorecardItem(
                     section_id=section.id, code=f"{t_code}-{s_suffix}-{idx:02d}",
                     question_text=q_text, response_type=resp_type,
                     max_score=Decimal(str(max_score)), weight=Decimal("1"),
-                    killer_metric_definition_id=km_def_id,
+                    killer_metric_definition_id=km_def.id if km_def else None,
                     display_order=idx,
                 ))
 

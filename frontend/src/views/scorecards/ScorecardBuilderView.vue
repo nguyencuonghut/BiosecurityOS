@@ -11,6 +11,7 @@ import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
+import Popover from 'primevue/popover'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Panel from 'primevue/panel'
@@ -173,6 +174,21 @@ function responseTypeLabel(val) {
   return responseTypeOptions.find((o) => o.value === val)?.label || val
 }
 
+function kmDefCode(id) {
+  return kmStore.definitions.find((d) => d.id === id)?.code || ''
+}
+function kmDefName(id) {
+  return kmStore.definitions.find((d) => d.id === id)?.name || ''
+}
+
+// ── Killer definition popover ──
+const killerPopover = ref()
+const activeKmDef = ref(null)
+function showKillerPopover(event, definitionId) {
+  activeKmDef.value = kmStore.definitions.find((d) => d.id === definitionId) || null
+  killerPopover.value.toggle(event)
+}
+
 async function handleClone() {
   try {
     const src = store.currentTemplate
@@ -268,9 +284,16 @@ async function handleClone() {
           </Column>
           <Column field="max_score" header="Max" style="width: 4rem" />
           <Column field="weight" header="Wt" style="width: 4rem" />
-          <Column header="Killer" style="width: 4rem">
+          <Column header="Killer" style="width: 10rem">
             <template #body="{ data }">
-              <i v-if="data.is_killer_related" class="pi pi-exclamation-triangle" style="color: var(--p-red-500)" />
+              <button
+                v-if="data.is_killer_related && data.killer_metric_definition_id"
+                class="killer-link"
+                @click="showKillerPopover($event, data.killer_metric_definition_id)"
+              >
+                <i class="pi pi-exclamation-triangle" />
+                {{ kmDefCode(data.killer_metric_definition_id) }}
+              </button>
             </template>
           </Column>
           <Column v-if="isDraft" header="" style="width: 6rem">
@@ -386,6 +409,29 @@ async function handleClone() {
   <div v-else class="loading-container">
     <i class="pi pi-spin pi-spinner" style="font-size: 2rem" />
   </div>
+
+  <!-- Killer Definition Popover -->
+  <Popover ref="killerPopover">
+    <div v-if="activeKmDef" class="km-popover">
+      <div class="km-popover-title">
+        <i class="pi pi-exclamation-triangle" style="color: var(--p-red-500)" />
+        <strong>{{ activeKmDef.code }}</strong>
+      </div>
+      <p class="km-popover-name">{{ activeKmDef.name }}</p>
+      <div class="km-popover-row" v-if="activeKmDef.description">
+        <span class="km-popover-label">Mô tả</span>
+        <span>{{ activeKmDef.description }}</span>
+      </div>
+      <div class="km-popover-row">
+        <span class="km-popover-label">Mức độ</span>
+        <Tag :value="activeKmDef.severity_level" :severity="activeKmDef.severity_level === 'critical' ? 'danger' : activeKmDef.severity_level === 'high' ? 'warn' : 'info'" />
+      </div>
+      <div class="km-popover-row">
+        <span class="km-popover-label">Nguồn</span>
+        <span>{{ { scorecard_item: 'Scorecard', field_report: 'Báo cáo', both: 'Cả hai' }[activeKmDef.source_type] || activeKmDef.source_type }}</span>
+      </div>
+    </div>
+  </Popover>
 </template>
 
 <style scoped>
@@ -436,4 +482,24 @@ async function handleClone() {
 .mt-2 { margin-top: 0.5rem; }
 .ml-2 { margin-left: 0.5rem; }
 .loading-container { display: flex; justify-content: center; padding: 4rem; }
+.killer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--p-red-500);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.killer-link:hover { text-decoration: underline; }
+.km-popover { display: flex; flex-direction: column; gap: 0.5rem; min-width: 220px; max-width: 300px; }
+.km-popover-title { display: flex; align-items: center; gap: 0.4rem; font-size: 1rem; }
+.km-popover-name { margin: 0; font-size: 0.9rem; color: var(--p-text-color); }
+.km-popover-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
+.km-popover-label { font-weight: 600; color: var(--p-text-muted-color); min-width: 52px; }
 </style>
