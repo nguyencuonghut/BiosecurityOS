@@ -130,6 +130,16 @@ class AreaOut(BaseModel):
 
 # ── Farm Route ──────────────────────────────────────────────────
 
+ROUTE_TYPE_LABELS: dict[str, str] = {
+    "vehicle": "Xe cộ",
+    "person": "Người",
+    "feed": "Thức ăn",
+    "deadstock": "Xác heo",
+    "equipment": "Dụng cụ",
+    "waste": "Chất thải",
+}
+
+
 class RouteCreate(BaseModel):
     route_type: str = Field(max_length=30)
     from_area_id: uuid.UUID
@@ -150,6 +160,11 @@ class RouteOut(BaseModel):
     note: str | None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def route_type_label(self) -> str:
+        return ROUTE_TYPE_LABELS.get(self.route_type, self.route_type)
 
 
 # ── External Risk Point ─────────────────────────────────────────

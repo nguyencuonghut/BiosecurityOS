@@ -94,7 +94,9 @@ async function onSubmit() {
     </div>
 
     <DataTable :value="farmStore.routes" stripedRows v-if="farmStore.routes.length">
-      <Column header="Loại" field="route_type" style="width: 8rem" />
+      <Column header="Loại" style="width: 8rem">
+        <template #body="{ data }">{{ data.route_type_label }}</template>
+      </Column>
       <Column header="Từ khu vực">
         <template #body="{ data }">{{ areaName(data.from_area_id) }}</template>
       </Column>
