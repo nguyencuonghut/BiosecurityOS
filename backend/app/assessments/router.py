@@ -82,6 +82,7 @@ async def get_assessment(
 ):
     obj = await service.get_assessment(db, uuid.UUID(assessment_id))
     data = AssessmentDetailOut.model_validate(obj).model_dump(mode="json")
+    data["farm_name"] = obj.farm.name if obj.farm else None
     return success_response(request, data)
 
 

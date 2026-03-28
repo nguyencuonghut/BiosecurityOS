@@ -5,14 +5,18 @@ import { useAssessmentStore } from '@/stores/assessment.js'
 import * as scorecardService from '@/services/scorecardService.js'
 import * as assessmentService from '@/services/assessmentService.js'
 import * as trustScoreService from '@/services/trustScoreService.js'
+import * as caseService from '@/services/caseService.js'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import ProgressBar from 'primevue/progressbar'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import Dialog from 'primevue/dialog'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import SpiderChart from '@/components/charts/SpiderChart.vue'
 import { useToast } from 'primevue/usetoast'
@@ -211,6 +215,83 @@ function goPrevSection() {
     activeSectionIndex.value--
   }
 }
+
+// ── Tạo Case từ Assessment ──────────────────────────────────────
+const showCaseDialog = ref(false)
+const creatingCase = ref(false)
+const caseForm = ref({
+  title: '',
+  summary: '',
+  priority: 'P1',
+  severity: 'medium',
+})
+
+const priorityOptions = [
+  { label: 'P0 — Khẩn cấp', value: 'P0' },
+  { label: 'P1 — Cao', value: 'P1' },
+  { label: 'P2 — Trung bình', value: 'P2' },
+  { label: 'P3 — Thấp', value: 'P3' },
+]
+
+const severityOptions = [
+  { label: 'Nghiêm trọng', value: 'critical' },
+  { label: 'Cao', value: 'high' },
+  { label: 'Trung bình', value: 'medium' },
+  { label: 'Thấp', value: 'low' },
+]
+
+function openCaseDialog() {
+  const a = assessment.value
+  const score = a?.overall_score != null ? Number(a.overall_score) : 100
+  // Auto-suggest priority/severity from score
+  let priority = 'P2'
+  let severity = 'medium'
+  if (killerFlaggedItems.value > 0 || score < 40) { priority = 'P0'; severity = 'critical' }
+  else if (score < 55) { priority = 'P1'; severity = 'high' }
+  else if (score < 70) { priority = 'P1'; severity = 'medium' }
+
+  caseForm.value = {
+    title: `Điểm ATSH thấp — ${a?.farm_name || 'Trại'}`,
+    summary: `Đánh giá ngày ${new Date(a?.assessment_date).toLocaleDateString('vi-VN')} đạt ${score.toFixed(0)} điểm. Có ${flaggedItems.value} tiêu chí không đạt, ${killerFlaggedItems.value} killer flags.`,
+    priority,
+    severity,
+  }
+  showCaseDialog.value = true
+}
+
+async function submitCreateCase() {
+  if (!caseForm.value.title.trim()) return
+  creatingCase.value = true
+  try {
+    const a = assessment.value
+    const created = await caseService.createCase({
+      farm_id: a.farm_id,
+      case_type: 'assessment_gap',
+      source_assessment_id: a.id,
+      title: caseForm.value.title,
+      summary: caseForm.value.summary,
+      priority: caseForm.value.priority,
+      severity: caseForm.value.severity,
+    })
+    showCaseDialog.value = false
+    toast.add({
+      severity: 'success',
+      summary: 'Đã tạo Case',
+      detail: created.case_no,
+      life: 4000,
+    })
+    router.push(`/cases/${created.id}`)
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi tạo Case',
+      detail: e.response?.data?.error?.message || 'Có lỗi xảy ra.',
+      life: 5000,
+    })
+  } finally {
+    creatingCase.value = false
+  }
+}
 </script>
 
 <template>
@@ -221,7 +302,7 @@ function goPrevSection() {
         <div class="header-left">
           <Button icon="pi pi-arrow-left" text rounded @click="router.push('/assessments')" class="back-btn" />
           <div>
-            <h2>{{ assessment.farm_name_snapshot || assessment.performed_by_name_snapshot || 'Đánh giá' }}</h2>
+            <h2>{{ assessment.farm_name || assessment.performed_by_name_snapshot || 'Đánh giá' }}</h2>
             <div class="header-meta">
               <StatusBadge :value="assessment.status" :label="assessment.status_label" />
               <Tag :value="assessment.assessment_type_label || assessment.assessment_type" severity="secondary" rounded />
@@ -389,9 +470,9 @@ function goPrevSection() {
       </DataTable>
     </div>
 
-    <!-- Action buttons (wireframe §4.5: Create case | Export | Open farm profile) -->
+    <!-- Action buttons -->
     <div v-if="showSpider" class="assessment-actions">
-      <Button label="Tạo Case" icon="pi pi-exclamation-circle" severity="warn" size="small" disabled />
+      <Button label="Tạo Case" icon="pi pi-exclamation-circle" severity="warn" size="small" @click="openCaseDialog" />
       <Button label="Xuất báo cáo" icon="pi pi-download" severity="secondary" size="small" disabled />
       <Button label="Xem hồ sơ trại" icon="pi pi-external-link" size="small" @click="router.push(`/farms/${assessment.farm_id}`)" />
     </div>
@@ -401,6 +482,50 @@ function goPrevSection() {
       <Button label="Lưu nháp" icon="pi pi-save" severity="secondary" @click="saveDraft" :loading="saving" />
       <Button label="Nộp đánh giá" icon="pi pi-send" @click="handleSubmit" :loading="saving" />
     </div>
+
+    <!-- Dialog Tạo Case -->
+    <Dialog
+      v-model:visible="showCaseDialog"
+      header="Tạo Risk Case từ đánh giá này"
+      modal
+      :style="{ width: '32rem' }"
+    >
+      <div class="create-case-form">
+        <div class="case-context-banner">
+          <i class="pi pi-chart-line" />
+          <span>
+            Điểm tổng:
+            <strong :class="assessment.overall_score >= 80 ? 'score-good' : assessment.overall_score >= 60 ? 'score-warn' : 'score-bad'">
+              {{ Number(assessment.overall_score).toFixed(0) }}
+            </strong>
+            — {{ flaggedItems }} không đạt
+            <span v-if="killerFlaggedItems > 0">, <strong class="score-bad">{{ killerFlaggedItems }} killer</strong></span>
+          </span>
+        </div>
+        <div class="field">
+          <label>Tiêu đề Case *</label>
+          <InputText v-model="caseForm.title" :fluid="true" placeholder="Mô tả ngắn vấn đề..." />
+        </div>
+        <div class="field">
+          <label>Tóm tắt</label>
+          <Textarea v-model="caseForm.summary" rows="3" :fluid="true" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Ưu tiên</label>
+            <Select v-model="caseForm.priority" :options="priorityOptions" optionLabel="label" optionValue="value" :fluid="true" />
+          </div>
+          <div class="field">
+            <label>Mức độ</label>
+            <Select v-model="caseForm.severity" :options="severityOptions" optionLabel="label" optionValue="value" :fluid="true" />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Hủy" severity="secondary" text @click="showCaseDialog = false" />
+        <Button label="Tạo Case" icon="pi pi-check" severity="warn" :loading="creatingCase" @click="submitCreateCase" />
+      </template>
+    </Dialog>
   </div>
   <div v-else class="loading-container">
     <i class="pi pi-spin pi-spinner" style="font-size: 2rem" />
@@ -409,7 +534,7 @@ function goPrevSection() {
 
 <style scoped>
 .assessment-form {
-  /* no max-width — match other pages */
+  container-type: inline-size;
 }
 
 /* ── Header Card ── */
@@ -865,4 +990,37 @@ function goPrevSection() {
 
 .ts-trend { font-size: 0.85rem; }
 .ts-note { font-size: 0.8rem; color: var(--p-text-muted-color); margin-top: 0.25rem; }
+
+/* ── Create Case Dialog ── */
+.create-case-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.case-context-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  background: color-mix(in srgb, var(--p-orange-500) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--p-orange-500) 30%, transparent);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+}
+.case-context-banner i { color: var(--p-orange-500); font-size: 1rem; }
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.field label {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
 </style>
