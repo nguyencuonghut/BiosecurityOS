@@ -564,11 +564,11 @@ Bảng task khắc phục/phòng ngừa do chuyên gia tạo.
 | task_no | varchar(50) | Có | Mã task duy nhất để quản trị và báo cáo. |
 | title | varchar(255) | Có | Tên công việc khắc phục/phòng ngừa. |
 | description | text | Có | Mô tả chi tiết công việc cần làm. |
-| task_type | varchar(30) | Có | Loại task: corrective, preventive, inspection, training, capex. |
+| task_type | corrective_task_type_enum | Có | Loại task (PostgreSQL ENUM): corrective \| preventive \| inspection \| training \| capex |
 | source_rca_id | uuid | Không | Bản RCA làm căn cứ tạo task nếu có. |
 | area_id | uuid | Không | Khu vực áp dụng công việc. |
 | priority | varchar(20) | Có | Mức ưu tiên xử lý P0-P3. |
-| status | varchar(30) | Có | Trạng thái task từ lúc tạo tới lúc đóng. |
+| status | corrective_task_status_enum | Có | Trạng thái task (PostgreSQL ENUM): open \| accepted \| in_progress \| pending_review \| needs_rework \| closed \| cancelled |
 | sla_due_at | timestamptz | Không | Hạn phải có phản hồi/tiếp nhận theo SLA. |
 | completion_due_at | timestamptz | Không | Hạn hoàn thành thực tế của task. |
 | completion_criteria | text | Không | Tiêu chí để xem task đạt yêu cầu. |

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.tasks.models import CorrectiveTask, TaskAssignee, TaskAttachment, TaskComment, TaskReview
+from app.tasks.models import CorrectiveTask, TaskAssignee, TaskAttachment, TaskComment, TaskReview, TaskType, TaskStatus
 from app.tasks.schemas import (
     ChangeTaskStatusRequest,
     TaskAssigneeInput,
@@ -27,18 +27,18 @@ from app.shared.optimistic_lock import apply_version_update, check_version
 # ── Constants ──
 
 VALID_PRIORITIES = {"P0", "P1", "P2", "P3"}
-VALID_TASK_TYPES = {"corrective", "preventive", "inspection", "training", "capex"}
+VALID_TASK_TYPES = {t.value for t in TaskType}
 VALID_RESPONSIBILITY_TYPES = {"owner", "support", "approver"}
 VALID_UPLOAD_STAGES = {"before", "during", "after", "review"}
 VALID_REVIEW_RESULTS = {"approved", "rejected", "needs_rework"}
 VALID_COMMENT_TYPES = {"note", "question", "update", "escalation", "rejection_reason"}
 
-VALID_TRANSITIONS: dict[str, list[str]] = {
-    "open": ["accepted", "cancelled"],
-    "accepted": ["in_progress", "cancelled"],
-    "in_progress": ["pending_review", "cancelled"],
-    "pending_review": ["closed", "needs_rework"],
-    "needs_rework": ["in_progress", "cancelled"],
+VALID_TRANSITIONS: dict[TaskStatus, list[TaskStatus]] = {
+    TaskStatus.OPEN:           [TaskStatus.ACCEPTED, TaskStatus.CANCELLED],
+    TaskStatus.ACCEPTED:       [TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
+    TaskStatus.IN_PROGRESS:    [TaskStatus.PENDING_REVIEW, TaskStatus.CANCELLED],
+    TaskStatus.PENDING_REVIEW: [TaskStatus.CLOSED, TaskStatus.NEEDS_REWORK],
+    TaskStatus.NEEDS_REWORK:   [TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
     # closed / cancelled are terminal
 }
 
@@ -61,13 +61,13 @@ def _validate_responsibility_type(r: str) -> None:
                            f"responsibility_type phải là: {', '.join(sorted(VALID_RESPONSIBILITY_TYPES))}")
 
 
-def _validate_transition(current: str, target: str) -> None:
+def _validate_transition(current: TaskStatus, target: TaskStatus) -> None:
     allowed = VALID_TRANSITIONS.get(current, [])
     if target not in allowed:
         raise AppException(
             422,
             "INVALID_STATUS_TRANSITION",
-            f"Không thể chuyển từ '{current}' sang '{target}'. Cho phép: {', '.join(allowed) or 'none'}",
+            f"Không thể chuyển từ '{current.value}' sang '{target.value}'. Cho phép: {', '.join(s.value for s in allowed) or 'none'}",
         )
 
 
@@ -111,7 +111,7 @@ async def create_task(
         source_rca_id=data.source_rca_id,
         area_id=data.area_id,
         priority=data.priority,
-        status="open",
+        status=TaskStatus.OPEN,
         sla_due_at=data.sla_due_at,
         completion_due_at=data.completion_due_at,
         completion_criteria=data.completion_criteria,
@@ -178,7 +178,10 @@ async def list_tasks(
         )
     if overdue:
         now = datetime.now(timezone.utc)
-        non_terminal = ("open", "accepted", "in_progress", "pending_review", "needs_rework")
+        non_terminal = (
+            TaskStatus.OPEN, TaskStatus.ACCEPTED, TaskStatus.IN_PROGRESS,
+            TaskStatus.PENDING_REVIEW, TaskStatus.NEEDS_REWORK,
+        )
         base = base.where(
             CorrectiveTask.completion_due_at < now,
             CorrectiveTask.status.in_(non_terminal),
@@ -227,7 +230,7 @@ async def update_task(
     task = await get_task(db, task_id)
     check_version(task.version, data.version)
 
-    if task.status in ("closed", "cancelled"):
+    if task.status in (TaskStatus.CLOSED, TaskStatus.CANCELLED):
         raise AppException(422, "TASK_TERMINAL", "Không thể sửa task đã closed/cancelled.")
 
     update_data = data.model_dump(exclude_unset=True, exclude={"version"})
@@ -255,7 +258,7 @@ async def change_status(
     _validate_transition(task.status, data.target_status)
 
     # BR-04: Cannot close without at least 1 approved review
-    if data.target_status == "closed":
+    if data.target_status == TaskStatus.CLOSED:
         has_approved = any(r.review_result == "approved" for r in task.reviews)
         if not has_approved:
             raise AppException(
@@ -283,7 +286,7 @@ async def submit_for_review(
 ) -> CorrectiveTask:
     task = await get_task(db, task_id)
     check_version(task.version, version)
-    _validate_transition(task.status, "pending_review")
+    _validate_transition(task.status, TaskStatus.PENDING_REVIEW)
 
     # Must have at least 1 evidence attachment
     if not task.task_attachments:
@@ -293,7 +296,7 @@ async def submit_for_review(
             "Cần ít nhất 1 bằng chứng (evidence) trước khi submit for review.",
         )
 
-    task.status = "pending_review"
+    task.status = TaskStatus.PENDING_REVIEW
     task.version = apply_version_update(task.version)
     await db.flush()
     await db.refresh(task)
@@ -368,7 +371,7 @@ async def create_review(
 ) -> TaskReview:
     task = await get_task(db, task_id)
 
-    if task.status != "pending_review":
+    if task.status != TaskStatus.PENDING_REVIEW:
         raise AppException(422, "NOT_PENDING_REVIEW", "Task phải ở trạng thái pending_review để review.")
 
     if data.review_result not in VALID_REVIEW_RESULTS:
@@ -394,7 +397,7 @@ async def create_review(
         # Task can now be closed (don't auto-close, let user decide)
         pass
     elif data.review_result in ("rejected", "needs_rework"):
-        task.status = "needs_rework"
+        task.status = TaskStatus.NEEDS_REWORK
         task.version = apply_version_update(task.version)
         await db.flush()
 

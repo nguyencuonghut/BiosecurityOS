@@ -500,17 +500,24 @@ CREATE TABLE biosec.rca_factor (
 );
 
 -- corrective_task
+CREATE TYPE biosec.corrective_task_type_enum AS ENUM (
+    'corrective', 'preventive', 'inspection', 'training', 'capex'
+);
+CREATE TYPE biosec.corrective_task_status_enum AS ENUM (
+    'open', 'accepted', 'in_progress', 'pending_review', 'needs_rework', 'closed', 'cancelled'
+);
+
 CREATE TABLE biosec.corrective_task (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     case_id uuid NOT NULL,
     task_no varchar(50) NOT NULL,
     title varchar(255) NOT NULL,
     description text NOT NULL,
-    task_type varchar(30) NOT NULL,
+    task_type biosec.corrective_task_type_enum NOT NULL,
     source_rca_id uuid,
     area_id uuid,
     priority varchar(20) NOT NULL,
-    status varchar(30) DEFAULT 'open' NOT NULL,
+    status biosec.corrective_task_status_enum DEFAULT 'open' NOT NULL,
     sla_due_at timestamptz,
     completion_due_at timestamptz,
     completion_criteria text,
@@ -522,9 +529,7 @@ CREATE TABLE biosec.corrective_task (
     archived_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
-    CONSTRAINT ck_corrective_task_1 CHECK (task_type IN ('corrective','preventive','inspection','training','capex')),
     CONSTRAINT ck_corrective_task_2 CHECK (priority IN ('P0','P1','P2','P3')),
-    CONSTRAINT ck_corrective_task_3 CHECK (status IN ('open','accepted','in_progress','pending_review','needs_rework','closed','cancelled')),
     CONSTRAINT ck_corrective_task_4 CHECK (completion_due_at IS NULL OR sla_due_at IS NULL OR completion_due_at >= sla_due_at)
 );
 

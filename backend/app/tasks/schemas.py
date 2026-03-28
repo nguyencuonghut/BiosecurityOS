@@ -3,7 +3,28 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, computed_field, model_validator
+
+from app.tasks.models import TaskStatus, TaskType
+
+
+TASK_TYPE_LABELS: dict[str, str] = {
+    TaskType.CORRECTIVE:  "Khắc phục",
+    TaskType.PREVENTIVE:  "Phòng ngừa",
+    TaskType.INSPECTION:  "Kiểm tra",
+    TaskType.TRAINING:    "Đào tạo",
+    TaskType.CAPEX:       "Đầu tư (CapEx)",
+}
+
+TASK_STATUS_LABELS: dict[str, str] = {
+    TaskStatus.OPEN:           "Mở mới",
+    TaskStatus.ACCEPTED:       "Đã nhận",
+    TaskStatus.IN_PROGRESS:    "Đang thực hiện",
+    TaskStatus.PENDING_REVIEW: "Chờ duyệt",
+    TaskStatus.NEEDS_REWORK:   "Cần làm lại",
+    TaskStatus.CLOSED:         "Đã đóng",
+    TaskStatus.CANCELLED:      "Đã hủy",
+}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -121,7 +142,7 @@ class TaskCreate(BaseModel):
     case_id: uuid.UUID
     title: str
     description: str
-    task_type: str
+    task_type: TaskType
     source_rca_id: uuid.UUID | None = None
     area_id: uuid.UUID | None = None
     priority: str
@@ -152,11 +173,11 @@ class TaskListOut(BaseModel):
     task_no: str
     title: str
     description: str
-    task_type: str
+    task_type: TaskType
     source_rca_id: uuid.UUID | None
     area_id: uuid.UUID | None
     priority: str
-    status: str
+    status: TaskStatus
     sla_due_at: datetime | None
     completion_due_at: datetime | None
     completion_criteria: str | None
@@ -170,6 +191,16 @@ class TaskListOut(BaseModel):
     updated_at: datetime
     assignees: list[TaskAssigneeOut] = []
 
+    @computed_field
+    @property
+    def task_type_label(self) -> str:
+        return TASK_TYPE_LABELS.get(self.task_type, self.task_type.value)
+
+    @computed_field
+    @property
+    def status_label(self) -> str:
+        return TASK_STATUS_LABELS.get(self.status, self.status.value)
+
 
 class TaskOut(TaskListOut):
     """Full schema for detail endpoint (includes nested reviews/comments/attachments)."""
@@ -179,5 +210,5 @@ class TaskOut(TaskListOut):
 
 
 class ChangeTaskStatusRequest(BaseModel):
-    target_status: str
+    target_status: TaskStatus
     version: int

@@ -34,7 +34,7 @@ from app.assessments.models import Assessment, AssessmentItemResult
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
 from app.trust_scores.models import TrustScoreSnapshot
 from app.cases.models import RiskCase, CaseParticipant, RcaRecord, RcaFactor
-from app.tasks.models import CorrectiveTask, TaskAssignee, TaskReview, TaskComment
+from app.tasks.models import CorrectiveTask, TaskAssignee, TaskReview, TaskComment, TaskType, TaskStatus
 from app.floorplans.models import FloorplanVersion, FloorplanMarker
 from app.scars.models import ScarRecord, ScarLink
 from app.lessons.models import LessonLearned, LessonReference, SimilarityTag
@@ -681,16 +681,16 @@ async def _seed_cases(db: AsyncSession, farms: dict, users: dict) -> dict:
 # ═══════════════════════════════════════════════════════════════
 
 TASK_DATA = [
-    ("TASK-2026-001", "RC-2026-001", "Lắp camera giám sát khu sạch", "corrective", "P0", "in_progress", "farm_mgr"),
-    ("TASK-2026-002", "RC-2026-001", "Cập nhật SOP kiểm soát thức ăn", "preventive", "P1", "open", "expert"),
-    ("TASK-2026-003", "RC-2026-002", "Sửa chữa hệ thống sát trùng xe", "corrective", "P0", "pending_review", "farm_mgr"),
-    ("TASK-2026-004", "RC-2026-002", "Đào tạo lại nhân viên bảo vệ", "preventive", "P1", "accepted", "farm_mgr"),
-    ("TASK-2026-005", "RC-2026-003", "Xây dựng SOP xử lý heo chết mới", "corrective", "P0", "open", "expert"),
-    ("TASK-2026-006", "RC-2026-004", "Lắp đặt barrier tự động cổng vào", "corrective", "P1", "closed", "farm_mgr"),
-    ("TASK-2026-007", "RC-2026-005", "Nâng cấp hạ tầng sát trùng khu đệm", "corrective", "P2", "open", "farm_mgr"),
-    ("TASK-2026-008", "RC-2026-006", "Kiểm tra chéo tự đánh giá và audit", "preventive", "P1", "in_progress", "auditor"),
-    ("TASK-2026-009", "RC-2026-003", "Mua thiết bị tiêu hủy xác heo", "corrective", "P1", "open", "farm_mgr"),
-    ("TASK-2026-010", "RC-2026-001", "Huấn luyện nhân viên về ATSH thức ăn", "preventive", "P2", "open", "farm_mgr"),
+    ("TASK-2026-001", "RC-2026-001", "Lắp camera giám sát khu sạch", TaskType.CORRECTIVE, "P0", TaskStatus.IN_PROGRESS, "farm_mgr"),
+    ("TASK-2026-002", "RC-2026-001", "Cập nhật SOP kiểm soát thức ăn", TaskType.PREVENTIVE, "P1", TaskStatus.OPEN, "expert"),
+    ("TASK-2026-003", "RC-2026-002", "Sửa chữa hệ thống sát trùng xe", TaskType.CORRECTIVE, "P0", TaskStatus.PENDING_REVIEW, "farm_mgr"),
+    ("TASK-2026-004", "RC-2026-002", "Đào tạo lại nhân viên bảo vệ", TaskType.TRAINING, "P1", TaskStatus.ACCEPTED, "farm_mgr"),
+    ("TASK-2026-005", "RC-2026-003", "Xây dựng SOP xử lý heo chết mới", TaskType.CORRECTIVE, "P0", TaskStatus.OPEN, "expert"),
+    ("TASK-2026-006", "RC-2026-004", "Lắp đặt barrier tự động cổng vào", TaskType.CORRECTIVE, "P1", TaskStatus.CLOSED, "farm_mgr"),
+    ("TASK-2026-007", "RC-2026-005", "Nâng cấp hạ tầng sát trùng khu đệm", TaskType.CORRECTIVE, "P2", TaskStatus.OPEN, "farm_mgr"),
+    ("TASK-2026-008", "RC-2026-006", "Kiểm tra chéo tự đánh giá và audit", TaskType.INSPECTION, "P1", TaskStatus.IN_PROGRESS, "auditor"),
+    ("TASK-2026-009", "RC-2026-003", "Mua thiết bị tiêu hủy xác heo", TaskType.CAPEX, "P1", TaskStatus.OPEN, "farm_mgr"),
+    ("TASK-2026-010", "RC-2026-001", "Huấn luyện nhân viên về ATSH thức ăn", TaskType.TRAINING, "P2", TaskStatus.OPEN, "farm_mgr"),
 ]
 
 
@@ -703,7 +703,7 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
             continue
 
         # Insert closed tasks as 'open' first (DB trigger requires review before close)
-        insert_status = "open" if status == "closed" else status
+        insert_status = TaskStatus.OPEN if status == TaskStatus.CLOSED else status
         # Some tasks are overdue — SLA due date in the past
         is_overdue = task_no in ("TASK-2026-005", "TASK-2026-007", "TASK-2026-009", "TASK-2026-010")
         if is_overdue:
@@ -735,12 +735,12 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
             accepted_at=NOW - timedelta(days=2) if status != "open" else None,
         ))
 
-        if status == "pending_review":
+        if status == TaskStatus.PENDING_REVIEW:
             db.add(TaskReview(
                 task_id=task.id, reviewer_user_id=users["expert"].id,
                 review_result="needs_rework", review_note="Đang xem xét bằng chứng đã nộp",
             ))
-        if status == "closed":
+        if status == TaskStatus.CLOSED:
             # Add review first, then mark for closing
             db.add(TaskReview(
                 task_id=task.id, reviewer_user_id=users["expert"].id,
@@ -752,7 +752,7 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
                 comment_type="update",
             ))
             tasks_to_close.append(task)
-        if status == "in_progress":
+        if status == TaskStatus.IN_PROGRESS:
             db.add(TaskComment(
                 task_id=task.id, author_user_id=users[assignee].id,
                 comment_text="Đã bắt đầu triển khai, dự kiến hoàn thành trong 3 ngày",
@@ -763,7 +763,7 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
 
     # Now close tasks that need it (review already exists)
     for task in tasks_to_close:
-        task.status = "closed"
+        task.status = TaskStatus.CLOSED
         task.closed_by_user_id = users["expert"].id
         task.closed_at = NOW - timedelta(days=1)
     await db.flush()

@@ -1,13 +1,36 @@
 """ORM models for Corrective Task module (Sprint 06)."""
 
+import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models_base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin, VersionMixin
+
+
+class TaskType(str, enum.Enum):
+    """Loại task khắc phục."""
+
+    CORRECTIVE = "corrective"
+    PREVENTIVE = "preventive"
+    INSPECTION = "inspection"
+    TRAINING = "training"
+    CAPEX = "capex"
+
+
+class TaskStatus(str, enum.Enum):
+    """Trạng thái corrective task."""
+
+    OPEN = "open"
+    ACCEPTED = "accepted"
+    IN_PROGRESS = "in_progress"
+    PENDING_REVIEW = "pending_review"
+    NEEDS_REWORK = "needs_rework"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
 
 
 class CorrectiveTask(UUIDPrimaryKeyMixin, TimestampMixin, VersionMixin, SoftDeleteMixin, Base):
@@ -19,7 +42,11 @@ class CorrectiveTask(UUIDPrimaryKeyMixin, TimestampMixin, VersionMixin, SoftDele
     task_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    task_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    task_type: Mapped[TaskType] = mapped_column(
+        SAEnum(TaskType, name="corrective_task_type_enum", schema="biosec",
+               create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     source_rca_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("biosec.rca_record.id", ondelete="SET NULL")
     )
@@ -27,7 +54,12 @@ class CorrectiveTask(UUIDPrimaryKeyMixin, TimestampMixin, VersionMixin, SoftDele
         UUID(as_uuid=True), ForeignKey("biosec.farm_area.id", ondelete="SET NULL")
     )
     priority: Mapped[str] = mapped_column(String(20), nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="open")
+    status: Mapped[TaskStatus] = mapped_column(
+        SAEnum(TaskStatus, name="corrective_task_status_enum", schema="biosec",
+               create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        server_default=text("'open'"),
+    )
     sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completion_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completion_criteria: Mapped[str | None] = mapped_column(Text)

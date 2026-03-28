@@ -37,22 +37,22 @@ const priorityOptions = [
 
 const statusOptions = [
   { label: 'Tất cả', value: null },
-  { label: 'Mở', value: 'open' },
-  { label: 'Đã chấp nhận', value: 'accepted' },
+  { label: 'Mở mới', value: 'open' },
+  { label: 'Đã nhận', value: 'accepted' },
   { label: 'Đang thực hiện', value: 'in_progress' },
-  { label: 'Đang review', value: 'pending_review' },
-  { label: 'Cần rework', value: 'needs_rework' },
+  { label: 'Chờ duyệt', value: 'pending_review' },
+  { label: 'Cần làm lại', value: 'needs_rework' },
   { label: 'Đã đóng', value: 'closed' },
   { label: 'Đã hủy', value: 'cancelled' },
 ]
 
 const taskTypeOptions = [
   { label: 'Tất cả', value: null },
-  { label: 'Corrective', value: 'corrective' },
-  { label: 'Preventive', value: 'preventive' },
-  { label: 'Inspection', value: 'inspection' },
-  { label: 'Training', value: 'training' },
-  { label: 'CapEx', value: 'capex' },
+  { label: 'Khắc phục', value: 'corrective' },
+  { label: 'Phòng ngừa', value: 'preventive' },
+  { label: 'Kiểm tra', value: 'inspection' },
+  { label: 'Đào tạo', value: 'training' },
+  { label: 'Đầu tư (CapEx)', value: 'capex' },
 ]
 
 const farmOptions = computed(() => [
@@ -84,20 +84,6 @@ function statusColor(s) {
     closed: 'success', cancelled: 'secondary',
   }
   return m[s] || 'secondary'
-}
-
-function statusLabel(s) {
-  const m = {
-    open: 'Mở', accepted: 'Chấp nhận', in_progress: 'Đang thực hiện',
-    pending_review: 'Đang review', needs_rework: 'Cần rework',
-    closed: 'Đã đóng', cancelled: 'Đã hủy',
-  }
-  return m[s] || s
-}
-
-function taskTypeLabel(t) {
-  const m = { corrective: 'Corrective', preventive: 'Preventive', inspection: 'Inspection', training: 'Training', capex: 'CapEx' }
-  return m[t] || t
 }
 
 function formatDate(d) {
@@ -219,7 +205,7 @@ onMounted(async () => {
           </Column>
           <Column header="Loại" style="width: 100px">
             <template #body="{ data }">
-              <Tag :value="taskTypeLabel(data.task_type)" severity="secondary" />
+              <Tag :value="data.task_type_label" severity="secondary" />
             </template>
           </Column>
           <Column header="Ưu tiên" style="width: 85px">
@@ -241,7 +227,7 @@ onMounted(async () => {
           </Column>
           <Column header="Trạng thái" style="width: 130px">
             <template #body="{ data }">
-              <Tag :value="statusLabel(data.status)" :severity="statusColor(data.status)" />
+              <Tag :value="data.status_label" :severity="statusColor(data.status)" />
             </template>
           </Column>
           <Column header="Tạo lúc" style="width: 130px">
@@ -271,12 +257,12 @@ onMounted(async () => {
           </div>
           <div class="preview-field">
             <label>Loại</label>
-            <Tag :value="taskTypeLabel(selectedTask.task_type)" severity="secondary" />
+            <Tag :value="selectedTask.task_type_label" severity="secondary" />
           </div>
         </div>
         <div class="preview-field">
           <label>Trạng thái</label>
-          <Tag :value="statusLabel(selectedTask.status)" :severity="statusColor(selectedTask.status)" />
+          <Tag :value="selectedTask.status_label" :severity="statusColor(selectedTask.status)" />
         </div>
         <div class="preview-field">
           <label>Hạn hoàn thành</label>

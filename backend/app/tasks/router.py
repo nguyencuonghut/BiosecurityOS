@@ -14,6 +14,7 @@ from app.shared.exceptions import success_response
 from app.shared.optimistic_lock import etag_headers
 from app.shared.pagination import PaginationParams, paginated_response
 from app.tasks import schemas, service
+from app.tasks.models import TaskStatus, TaskType
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -32,8 +33,8 @@ async def list_tasks(
     farm_id: Annotated[uuid.UUID | None, Query()] = None,
     case_id: Annotated[uuid.UUID | None, Query()] = None,
     priority: Annotated[str | None, Query()] = None,
-    status: Annotated[str | None, Query()] = None,
-    task_type: Annotated[str | None, Query()] = None,
+    status: Annotated[TaskStatus | None, Query()] = None,
+    task_type: Annotated[TaskType | None, Query()] = None,
     assignee_user_id: Annotated[uuid.UUID | None, Query()] = None,
     overdue: Annotated[bool, Query()] = False,
 ):

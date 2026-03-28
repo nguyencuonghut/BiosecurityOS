@@ -214,11 +214,11 @@ function statusColor(s) {
   return m[s] || 'secondary'
 }
 function statusLabel(s) {
-  const m = { open: 'Mở', accepted: 'Chấp nhận', in_progress: 'Đang thực hiện', pending_review: 'Đang review', needs_rework: 'Cần rework', closed: 'Đã đóng', cancelled: 'Đã hủy' }
+  const m = { open: 'Mở mới', accepted: 'Đã nhận', in_progress: 'Đang thực hiện', pending_review: 'Chờ duyệt', needs_rework: 'Cần làm lại', closed: 'Đã đóng', cancelled: 'Đã hủy' }
   return m[s] || s
 }
 function taskTypeLabel(t) {
-  const m = { corrective: 'Corrective', preventive: 'Preventive', inspection: 'Inspection', training: 'Training', capex: 'CapEx' }
+  const m = { corrective: 'Khắc phục', preventive: 'Phòng ngừa', inspection: 'Kiểm tra', training: 'Đào tạo', capex: 'Đầu tư (CapEx)' }
   return m[t] || t
 }
 function formatDate(d) {
@@ -264,9 +264,9 @@ onMounted(async () => {
         <div class="header-title-block">
           <h1 class="task-title">{{ task.task_no }} <span class="title-sep">—</span> {{ task.title }}</h1>
           <div class="header-tags">
-            <Tag :value="taskTypeLabel(task.task_type)" severity="secondary" />
+            <Tag :value="task.task_type_label" severity="secondary" />
             <Tag :value="task.priority" :severity="priorityColor(task.priority)" />
-            <Tag :value="statusLabel(task.status)" :severity="statusColor(task.status)" />
+            <Tag :value="task.status_label" :severity="statusColor(task.status)" />
           </div>
         </div>
         <div class="header-actions">
