@@ -29,6 +29,20 @@ export async function listAreaTypes() {
   return data.data
 }
 
+export async function createAreaType(payload) {
+  const { data } = await apiClient.post('/farms/area-types', payload)
+  return data.data
+}
+
+export async function updateAreaType(id, payload) {
+  const { data } = await apiClient.put(`/farms/area-types/${id}`, payload)
+  return data.data
+}
+
+export async function deleteAreaType(id) {
+  await apiClient.delete(`/farms/area-types/${id}`)
+}
+
 // ── Area ───────────────────────────────────────────────────────
 
 export async function listAreas(farmId) {

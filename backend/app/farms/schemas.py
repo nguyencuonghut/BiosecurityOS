@@ -67,6 +67,18 @@ class FarmOut(BaseModel):
 
 # ── Area Type ───────────────────────────────────────────────────
 
+class AreaTypeCreate(BaseModel):
+    code: str = Field(max_length=50)
+    name: str = Field(max_length=100)
+    display_order: int = Field(default=0, ge=0)
+
+
+class AreaTypeUpdate(BaseModel):
+    code: str | None = Field(default=None, max_length=50)
+    name: str | None = Field(default=None, max_length=100)
+    display_order: int | None = Field(default=None, ge=0)
+
+
 class AreaTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

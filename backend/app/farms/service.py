@@ -9,7 +9,9 @@ from app.auth.models import AppUser, Farm
 from app.farms.models import AreaType, ExternalRiskPoint, FarmArea, FarmRoute
 from app.farms.schemas import (
     AreaCreate,
+    AreaTypeCreate,
     AreaTypeOut,
+    AreaTypeUpdate,
     AreaUpdate,
     ExternalRiskPointCreate,
     FarmCreate,
@@ -114,6 +116,45 @@ async def update_farm(db: AsyncSession, farm_id: uuid.UUID, data: FarmUpdate) ->
 async def list_area_types(db: AsyncSession) -> list[AreaType]:
     result = await db.execute(select(AreaType).order_by(AreaType.display_order, AreaType.name))
     return list(result.scalars().all())
+
+
+async def create_area_type(db: AsyncSession, payload: AreaTypeCreate) -> AreaType:
+    existing = await db.execute(select(AreaType).where(AreaType.code == payload.code))
+    if existing.scalar_one_or_none():
+        raise ConflictException(f"Mã loại khu vực '{payload.code}' đã tồn tại.")
+    obj = AreaType(code=payload.code, name=payload.name, display_order=payload.display_order)
+    db.add(obj)
+    await db.flush()
+    await db.refresh(obj)
+    return obj
+
+
+async def update_area_type(db: AsyncSession, area_type_id: uuid.UUID, payload: AreaTypeUpdate) -> AreaType:
+    result = await db.execute(select(AreaType).where(AreaType.id == area_type_id))
+    obj = result.scalar_one_or_none()
+    if not obj:
+        raise NotFoundException("Không tìm thấy loại khu vực.")
+    if payload.code is not None and payload.code != obj.code:
+        dup = await db.execute(select(AreaType).where(AreaType.code == payload.code))
+        if dup.scalar_one_or_none():
+            raise ConflictException(f"Mã loại khu vực '{payload.code}' đã tồn tại.")
+        obj.code = payload.code
+    if payload.name is not None:
+        obj.name = payload.name
+    if payload.display_order is not None:
+        obj.display_order = payload.display_order
+    await db.flush()
+    await db.refresh(obj)
+    return obj
+
+
+async def delete_area_type(db: AsyncSession, area_type_id: uuid.UUID) -> None:
+    result = await db.execute(select(AreaType).where(AreaType.id == area_type_id))
+    obj = result.scalar_one_or_none()
+    if not obj:
+        raise NotFoundException("Không tìm thấy loại khu vực.")
+    await db.delete(obj)
+    await db.flush()
 
 
 # ── Farm Area ───────────────────────────────────────────────────

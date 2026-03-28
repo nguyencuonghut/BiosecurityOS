@@ -143,6 +143,12 @@ const routes = [
         component: () => import('@/views/admin/AuditLogView.vue'),
         meta: { permission: 'AUDIT_LOG_READ' },
       },
+      {
+        path: 'config/area-types',
+        name: 'AreaTypeAdmin',
+        component: () => import('@/views/config/AreaTypeAdminView.vue'),
+        meta: { permission: 'USER_ADMIN' },
+      },
     ],
   },
   {

@@ -10,8 +10,22 @@ const route = useRoute()
 const sidebarRef = ref(null)
 let outsideClickListener = null
 
-const menuItems = computed(() => {
-  const all = [
+// Groups that are expanded (by group label)
+const expandedGroups = ref(new Set(['Cấu hình']))
+
+function toggleGroup(label) {
+  if (expandedGroups.value.has(label)) {
+    expandedGroups.value.delete(label)
+  } else {
+    expandedGroups.value.add(label)
+  }
+  // trigger reactivity
+  expandedGroups.value = new Set(expandedGroups.value)
+}
+
+const navTree = computed(() => {
+  const can = (perm) => !perm || authStore.hasPermission(perm)
+  const flat = [
     { label: 'Dashboard', icon: 'pi pi-chart-bar', to: '/', permission: null },
     { label: 'Trại', icon: 'pi pi-building', to: '/farms', permission: 'FARM_READ' },
     { label: 'Scorecard', icon: 'pi pi-list', to: '/scorecards', permission: 'SCORECARD_READ' },
@@ -27,13 +41,31 @@ const menuItems = computed(() => {
     { label: 'Phân quyền', icon: 'pi pi-shield', to: '/admin/roles', permission: 'USER_ADMIN' },
     { label: 'KM Definitions', icon: 'pi pi-exclamation-circle', to: '/killer-metrics/definitions', permission: 'KILLER_EVENT_WRITE' },
     { label: 'Nhật ký', icon: 'pi pi-history', to: '/admin/audit-logs', permission: 'AUDIT_LOG_READ' },
+    {
+      label: 'Cấu hình',
+      icon: 'pi pi-sliders-h',
+      permission: 'USER_ADMIN',
+      children: [
+        { label: 'Loại khu vực', icon: 'pi pi-tag', to: '/config/area-types', permission: 'USER_ADMIN' },
+      ],
+    },
   ]
-  return all.filter((item) => !item.permission || authStore.hasPermission(item.permission))
+  return flat
+    .filter((item) => can(item.permission))
+    .map((item) => ({
+      ...item,
+      children: item.children?.filter((c) => can(c.permission)),
+    }))
+    .filter((item) => !item.children || item.children.length > 0)
 })
 
 function isActive(to) {
   if (to === '/') return route.path === '/'
   return route.path === to || route.path.startsWith(to + '/')
+}
+
+function isGroupActive(item) {
+  return item.children?.some((c) => isActive(c.to))
 }
 
 watch(
@@ -95,16 +127,45 @@ onBeforeUnmount(() => {
     </div>
 
     <nav class="sidebar-nav">
-      <router-link
-        v-for="item in menuItems"
-        :key="item.to"
-        :to="item.to"
-        class="nav-item"
-        :class="{ active: isActive(item.to) }"
-      >
-        <i :class="item.icon"></i>
-        <span class="nav-label">{{ item.label }}</span>
-      </router-link>
+      <template v-for="item in navTree" :key="item.label">
+        <!-- Group with children -->
+        <template v-if="item.children">
+          <button
+            class="nav-item nav-group"
+            :class="{ 'group-active': isGroupActive(item) }"
+            @click="toggleGroup(item.label)"
+          >
+            <i :class="item.icon"></i>
+            <span class="nav-label">{{ item.label }}</span>
+            <i
+              class="nav-chevron pi"
+              :class="expandedGroups.has(item.label) ? 'pi-chevron-down' : 'pi-chevron-right'"
+            />
+          </button>
+          <div v-show="expandedGroups.has(item.label)" class="nav-children">
+            <router-link
+              v-for="child in item.children"
+              :key="child.to"
+              :to="child.to"
+              class="nav-item nav-child"
+              :class="{ active: isActive(child.to) }"
+            >
+              <i :class="child.icon"></i>
+              <span class="nav-label">{{ child.label }}</span>
+            </router-link>
+          </div>
+        </template>
+        <!-- Flat item -->
+        <router-link
+          v-else
+          :to="item.to"
+          class="nav-item"
+          :class="{ active: isActive(item.to) }"
+        >
+          <i :class="item.icon"></i>
+          <span class="nav-label">{{ item.label }}</span>
+        </router-link>
+      </template>
     </nav>
   </div>
 </template>
@@ -183,6 +244,46 @@ onBeforeUnmount(() => {
 
 .nav-label {
   transition: opacity 0.3s ease;
+  flex: 1;
+}
+
+.nav-group {
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--p-text-color);
+}
+
+.nav-group:hover {
+  background: var(--p-surface-hover);
+}
+
+.nav-group.group-active {
+  color: var(--p-primary-color);
+}
+
+.nav-chevron {
+  font-size: 0.75rem;
+  width: auto;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 0.1rem;
+}
+
+.nav-child {
+  padding-left: 2.5rem;
+  font-size: 0.85rem;
 }
 
 .layout-sidebar::-webkit-scrollbar {

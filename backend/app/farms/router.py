@@ -12,7 +12,9 @@ from app.farms import service
 from app.farms.schemas import (
     AreaCreate,
     AreaOut,
+    AreaTypeCreate,
     AreaTypeOut,
+    AreaTypeUpdate,
     AreaUpdate,
     ExternalRiskPointCreate,
     ExternalRiskPointOut,
@@ -39,6 +41,41 @@ async def list_area_types(
     items = await service.list_area_types(db)
     data = [AreaTypeOut.model_validate(t).model_dump(mode="json") for t in items]
     return success_response(request, data)
+
+
+@router.post("/area-types", status_code=201)
+async def create_area_type(
+    request: Request,
+    body: AreaTypeCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    obj = await service.create_area_type(db, body)
+    await db.commit()
+    return success_response(request, AreaTypeOut.model_validate(obj).model_dump(mode="json"))
+
+
+@router.put("/area-types/{area_type_id}")
+async def update_area_type(
+    area_type_id: uuid.UUID,
+    request: Request,
+    body: AreaTypeUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    obj = await service.update_area_type(db, area_type_id, body)
+    await db.commit()
+    return success_response(request, AreaTypeOut.model_validate(obj).model_dump(mode="json"))
+
+
+@router.delete("/area-types/{area_type_id}", status_code=204)
+async def delete_area_type(
+    area_type_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("USER_ADMIN")],
+):
+    await service.delete_area_type(db, area_type_id)
+    await db.commit()
 
 
 # ── Farm CRUD ───────────────────────────────────────────────────
