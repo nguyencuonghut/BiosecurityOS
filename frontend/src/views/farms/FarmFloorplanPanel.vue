@@ -58,23 +58,20 @@ const unplacedAreas = computed(() => {
   return farmStore.areas.filter(a => a.is_active && !placedAreaIds.has(a.id))
 })
 
-const areaTypeLabels = {
-  gate: 'Cổng',
-  barn: 'Chuồng',
-  storage: 'Kho',
-  office: 'Văn phòng',
-  yard: 'Sân',
-  buffer_zone: 'Vùng đệm',
-  shower: 'Nhà tắm',
-  quarantine: 'Cách ly',
-  other: 'Khác',
-}
+
+
+const areaTypeMap = computed(() => {
+  const map = {}
+  for (const t of farmStore.areaTypes) map[t.id] = t.name
+  return map
+})
 
 onMounted(async () => {
   await fetchFloorplans()
-  // Ensure areas and routes are loaded
+  // Ensure areas, routes and area types are loaded
   if (!farmStore.areas.length) await farmStore.fetchAreas(props.farmId)
   if (!farmStore.routes.length) await farmStore.fetchRoutes(props.farmId)
+  if (!farmStore.areaTypes.length) await farmStore.fetchAreaTypes()
 })
 
 async function fetchFloorplans() {
@@ -227,7 +224,7 @@ async function submitPlaceMarker() {
   try {
     await floorplanService.createMarker(activeFloorplanId.value, {
       area_id: area.id,
-      marker_type: area.area_type || 'other',
+      marker_type: 'other',
       label: area.name,
       x_percent: placingCoords.value.x_percent,
       y_percent: placingCoords.value.y_percent,
@@ -274,8 +271,8 @@ async function onMarkerDragEnd({ id, x_percent, y_percent }) {
 }
 
 function areaOptionLabel(area) {
-  const typeLabel = areaTypeLabels[area.area_type] || area.area_type
-  return `${area.name} (${typeLabel})`
+  const typeName = area.area_type_id ? areaTypeMap.value[area.area_type_id] : null
+  return typeName ? `${area.name} (${typeName})` : area.name
 }
 </script>
 

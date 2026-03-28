@@ -8,7 +8,7 @@ import asyncio
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import AppRole, AppUser, AppUserCredential, UserRole, Farm, Region
@@ -231,11 +231,15 @@ async def _seed_regions_and_farms(db: AsyncSession, users: dict, area_types: dic
     await db.flush()
 
     for farm_code, farm in farms.items():
+        # Xóa data cũ (routes trước vì RESTRICT FK, rồi areas)
+        await db.execute(delete(FarmRoute).where(FarmRoute.farm_id == farm.id))
+        await db.execute(delete(FarmArea).where(FarmArea.farm_id == farm.id))
+        print(f"  Cleared old areas/routes for {farm_code}")
+    await db.flush()
+
+    for farm_code, farm in farms.items():
         for suffix, area_name, area_type_code, cdc in SEED_AREAS:
             area_code = f"{farm_code}-{suffix}"
-            result = await db.execute(select(FarmArea).where(FarmArea.code == area_code))
-            if result.scalar_one_or_none():
-                continue
             area = FarmArea(
                 farm_id=farm.id, code=area_code, name=area_name,
                 area_type_id=area_types[area_type_code].id,
@@ -691,9 +695,15 @@ CASE_DATA = [
 
 async def _seed_cases(db: AsyncSession, farms: dict, users: dict) -> dict:
     cases = {}
+    new_cases = set()
     for case_no, farm_code, title, c_type, priority, severity, status in CASE_DATA:
         farm = farms.get(farm_code)
         if not farm:
+            continue
+        existing = await db.execute(select(RiskCase).where(RiskCase.case_no == case_no))
+        existing_case = existing.scalar_one_or_none()
+        if existing_case:
+            cases[case_no] = existing_case
             continue
         case = RiskCase(
             farm_id=farm.id, case_no=case_no, case_type=c_type,
@@ -705,16 +715,19 @@ async def _seed_cases(db: AsyncSession, farms: dict, users: dict) -> dict:
         )
         db.add(case)
         cases[case_no] = case
+        new_cases.add(case_no)
     await db.flush()
 
-    for case in cases.values():
+    for case_no, case in cases.items():
+        if case_no not in new_cases:
+            continue
         db.add(CaseParticipant(case_id=case.id, user_id=users["expert"].id, role_in_case="owner"))
         db.add(CaseParticipant(case_id=case.id, user_id=users["farm_mgr"].id, role_in_case="farm_contact"))
     await db.flush()
 
     for case_no in ["RC-2026-001", "RC-2026-002", "RC-2026-006"]:
         case = cases.get(case_no)
-        if not case:
+        if not case or case_no not in new_cases:
             continue
         rca = RcaRecord(
             case_id=case.id, method="5_why",
@@ -766,6 +779,10 @@ async def _seed_tasks(db: AsyncSession, cases: dict, users: dict) -> None:
     for task_no, case_no, title, t_type, priority, status, assignee in TASK_DATA:
         case = cases.get(case_no)
         if not case:
+            continue
+        existing_task = (await db.execute(select(CorrectiveTask).where(CorrectiveTask.task_no == task_no))).scalar_one_or_none()
+        if existing_task:
+            count += 1
             continue
 
         # Insert closed tasks as 'open' first (DB trigger requires review before close)
@@ -868,6 +885,13 @@ async def _seed_floorplans(db: AsyncSession, farms: dict, areas: dict, users: di
         farm = farms.get(farm_code)
         if not farm:
             continue
+        existing_fp = (await db.execute(select(FloorplanVersion).where(
+            FloorplanVersion.farm_id == farm.id,
+            FloorplanVersion.title == title,
+        ))).scalar_one_or_none()
+        if existing_fp:
+            floorplans[farm_code] = existing_fp
+            continue
         fp = FloorplanVersion(
             farm_id=farm.id, version_no=1, title=title,
             effective_from=eff_from, status="active",
@@ -917,11 +941,21 @@ SCAR_DATA = [
 async def _seed_scars(db: AsyncSession, farms: dict, areas: dict, floorplans: dict, cases: dict, users: dict) -> None:
     count = 0
     scars = []
+    new_scar_indices = set()
     for farm_code, area_suffix, s_type, title, desc, confidence, days_ago, x, y in SCAR_DATA:
         farm = farms.get(farm_code)
         area = areas.get((farm_code, area_suffix))
         fp = floorplans.get(farm_code)
         if not farm:
+            continue
+
+        existing_scar = (await db.execute(select(ScarRecord).where(
+            ScarRecord.farm_id == farm.id,
+            ScarRecord.title == title,
+        ))).scalar_one_or_none()
+        if existing_scar:
+            scars.append(existing_scar)
+            count += 1
             continue
 
         # Recurrence detection
@@ -945,6 +979,7 @@ async def _seed_scars(db: AsyncSession, farms: dict, areas: dict, floorplans: di
             validated_at=NOW - timedelta(days=days_ago - 2) if confidence == "confirmed" else None,
         )
         db.add(scar)
+        new_scar_indices.add(len(scars))
         scars.append(scar)
         count += 1
     await db.flush()
@@ -958,7 +993,7 @@ async def _seed_scars(db: AsyncSession, farms: dict, areas: dict, floorplans: di
     }
     for case_no, scar_idx in case_scar_map.items():
         case = cases.get(case_no)
-        if case and scar_idx < len(scars):
+        if case and scar_idx < len(scars) and scar_idx in new_scar_indices:
             db.add(ScarLink(
                 scar_id=scars[scar_idx].id,
                 linked_object_type="case",
