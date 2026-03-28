@@ -30,7 +30,7 @@ import app.lessons.models  # noqa: F401
 
 from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint
 from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
-from app.assessments.models import Assessment
+from app.assessments.models import Assessment, AssessmentItemResult
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
 from app.trust_scores.models import TrustScoreSnapshot
 from app.cases.models import RiskCase, CaseParticipant, RcaRecord, RcaFactor
@@ -431,6 +431,83 @@ async def _seed_assessments(db: AsyncSession, farms: dict, templates: dict, user
 # ═══════════════════════════════════════════════════════════════
 # 5. Trust Scores
 # ═══════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════
+# 4b. Assessment Item Results
+# ═══════════════════════════════════════════════════════════════
+
+async def _seed_assessment_item_results(db: AsyncSession, assessments: dict) -> None:
+    """Tạo kết quả từng tiêu chí cho tất cả assessments theo overall_score ratio."""
+    import random
+    rng = random.Random(42)
+
+    # Load all scorecard items keyed by template_id
+    from app.scorecards.models import ScorecardItem, ScorecardSection
+    items_result = await db.execute(
+        select(ScorecardItem, ScorecardSection.template_id)
+        .join(ScorecardSection, ScorecardSection.id == ScorecardItem.section_id)
+        .order_by(ScorecardSection.display_order, ScorecardItem.display_order)
+    )
+    items_by_template: dict[str, list] = {}
+    for item, tmpl_id in items_result.all():
+        key = str(tmpl_id)
+        items_by_template.setdefault(key, []).append(item)
+
+    total = 0
+    for assess in assessments.values():
+        # Check if item results already exist for this assessment
+        existing = await db.execute(
+            select(AssessmentItemResult).where(
+                AssessmentItemResult.assessment_id == assess.id
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        items = items_by_template.get(str(assess.template_id), [])
+        if not items:
+            continue
+
+        # Use overall_score as a ratio to award proportional scores (with ±10% noise)
+        ratio = float(assess.overall_score or 70) / 100.0
+
+        for item in items:
+            max_s = float(item.max_score)
+            rtype = item.response_type
+            # Add ±10% noise around the ratio
+            noise = rng.uniform(-0.10, 0.10)
+            effective_ratio = max(0.0, min(1.0, ratio + noise))
+
+            if rtype == "yes_no":
+                awarded = max_s if effective_ratio >= 0.5 else 0.0
+                resp_text = "yes" if effective_ratio >= 0.5 else "no"
+                resp_num = None
+            elif rtype == "score_0_5":
+                resp_num = float(round(effective_ratio * 5))
+                awarded = round((resp_num / 5) * max_s, 2)
+                resp_text = None
+            elif rtype == "numeric":
+                resp_num = round(effective_ratio * max_s, 2)
+                awarded = resp_num
+                resp_text = None
+            else:  # option, text
+                awarded = round(effective_ratio * max_s, 2)
+                resp_text = "Đạt" if effective_ratio >= 0.5 else "Không đạt"
+                resp_num = None
+
+            db.add(AssessmentItemResult(
+                assessment_id=assess.id,
+                scorecard_item_id=item.id,
+                response_value_text=resp_text,
+                response_value_numeric=Decimal(str(resp_num)) if resp_num is not None else None,
+                awarded_score=Decimal(str(awarded)),
+                is_non_compliant=awarded < (max_s * 0.5),
+            ))
+            total += 1
+
+    await db.flush()
+    print(f"  Created {total} assessment item results")
+
 
 async def _seed_trust_scores(db: AsyncSession, farms: dict, assessments: dict) -> None:
     count = 0
@@ -957,6 +1034,9 @@ async def seed_all() -> None:
 
         print("\n[4/11] Seeding assessments...")
         assessments = await _seed_assessments(db, farms, templates, users)
+
+        print("\n[4b/11] Seeding assessment item results...")
+        await _seed_assessment_item_results(db, assessments)
 
         print("\n[5/11] Seeding trust scores...")
         await _seed_trust_scores(db, farms, assessments)
