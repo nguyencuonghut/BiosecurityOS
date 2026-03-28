@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import Tree from 'primevue/tree'
 import Button from 'primevue/button'
@@ -28,21 +28,15 @@ const errorMsg = ref('')
 const form = ref({
   code: '',
   name: '',
-  area_type: '',
+  area_type_id: null,
   parent_area_id: null,
   clean_dirty_class: null,
   is_active: true,
 })
 
-const areaTypeOptions = [
-  { label: 'Cổng', value: 'gate' },
-  { label: 'Chuồng', value: 'barn' },
-  { label: 'Kho', value: 'storage' },
-  { label: 'Văn phòng', value: 'office' },
-  { label: 'Sân', value: 'yard' },
-  { label: 'Đệm', value: 'buffer_zone' },
-  { label: 'Khác', value: 'other' },
-]
+const areaTypeOptions = computed(() =>
+  farmStore.areaTypes.map((t) => ({ label: t.name, value: t.id }))
+)
 
 const cleanDirtyOptions = [
   { label: '— Chưa phân loại —', value: null },
@@ -60,7 +54,7 @@ const treeNodes = computed(() => {
   areas.forEach((a) => {
     idMap[a.id] = {
       key: a.id,
-      label: `${a.code} — ${a.name}`,
+      label: `${a.code} — ${a.name} (${a.area_type_name || a.area_type_id})`,
       data: a,
       children: [],
     }
@@ -91,7 +85,7 @@ function openCreate(parentId = null) {
   form.value = {
     code: '',
     name: '',
-    area_type: '',
+    area_type_id: null,
     parent_area_id: parentId,
     clean_dirty_class: null,
     is_active: true,
@@ -105,7 +99,7 @@ function openEdit(area) {
   form.value = {
     code: area.code,
     name: area.name,
-    area_type: area.area_type,
+    area_type_id: area.area_type_id,
     parent_area_id: area.parent_area_id,
     clean_dirty_class: area.clean_dirty_class,
     is_active: area.is_active,
@@ -115,8 +109,13 @@ function openEdit(area) {
 }
 
 async function onSubmit() {
+
+onMounted(() => {
+  farmStore.fetchAreaTypes()
+})
+
   errorMsg.value = ''
-  if (!form.value.name?.trim() || !form.value.area_type) {
+  if (!form.value.name?.trim() || !form.value.area_type_id) {
     errorMsg.value = 'Vui lòng nhập Tên và Loại khu vực.'
     return
   }
@@ -198,7 +197,7 @@ async function onSubmit() {
         </div>
         <div class="field">
           <label>Loại *</label>
-          <Select v-model="form.area_type" :options="areaTypeOptions" optionLabel="label" optionValue="value" placeholder="Chọn loại" :fluid="true" />
+          <Select v-model="form.area_type_id" :options="areaTypeOptions" optionLabel="label" optionValue="value" placeholder="Chọn loại" :fluid="true" />
         </div>
         <div class="field">
           <label>Khu vực cha</label>

@@ -12,6 +12,7 @@ from app.farms import service
 from app.farms.schemas import (
     AreaCreate,
     AreaOut,
+    AreaTypeOut,
     AreaUpdate,
     ExternalRiskPointCreate,
     ExternalRiskPointOut,
@@ -25,6 +26,19 @@ from app.shared.exceptions import success_response
 from app.shared.pagination import PaginationParams, paginated_response
 
 router = APIRouter()
+
+
+# ── Area Types (reference data) ─────────────────────────────────
+
+@router.get("/area-types")
+async def list_area_types(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[None, require_permission("FARM_READ")],
+):
+    items = await service.list_area_types(db)
+    data = [AreaTypeOut.model_validate(t).model_dump(mode="json") for t in items]
+    return success_response(request, data)
 
 
 # ── Farm CRUD ───────────────────────────────────────────────────

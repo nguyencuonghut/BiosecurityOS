@@ -22,6 +22,15 @@ class RiskType(str, enum.Enum):
     OTHER = "other"
 
 
+class AreaType(Base):
+    __tablename__ = "area_type"
+    __table_args__ = {"schema": "biosec"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
 class FarmArea(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "farm_area"
 
@@ -33,12 +42,15 @@ class FarmArea(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    area_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    area_type_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("biosec.area_type.id", ondelete="RESTRICT"), nullable=False
+    )
     clean_dirty_class: Mapped[str | None] = mapped_column(String(30), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), nullable=False)
 
     farm = relationship("Farm", back_populates="areas")
     parent = relationship("FarmArea", remote_side="FarmArea.id", backref="children")
+    area_type_rel: Mapped["AreaType"] = relationship("AreaType", lazy="selectin")
 
 
 class FarmRoute(UUIDPrimaryKeyMixin, TimestampMixin, Base):

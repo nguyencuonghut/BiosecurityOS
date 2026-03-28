@@ -13,6 +13,7 @@ export const useFarmStore = defineStore('farm', () => {
   // ── Detail state ──
   const currentFarm = ref(null)
   const areas = ref([])
+  const areaTypes = ref([])
   const routes = ref([])
   const riskPoints = ref([])
 
@@ -54,6 +55,11 @@ export const useFarmStore = defineStore('farm', () => {
       currentFarm.value = await farmService.createFarm(payload)
     }
     return currentFarm.value
+  }
+
+  async function fetchAreaTypes() {
+    if (areaTypes.value.length) return
+    areaTypes.value = await farmService.listAreaTypes()
   }
 
   async function fetchAreas(farmId) {
@@ -100,9 +106,9 @@ export const useFarmStore = defineStore('farm', () => {
 
   return {
     farms, totalRecords, loading, filters,
-    currentFarm, areas, routes, riskPoints, regions,
+    currentFarm, areas, areaTypes, routes, riskPoints, regions,
     fetchFarms, fetchFarm, saveFarm,
-    fetchAreas, saveArea,
+    fetchAreaTypes, fetchAreas, saveArea,
     fetchRoutes, saveRoute,
     fetchRiskPoints, saveRiskPoint,
     fetchRegions,

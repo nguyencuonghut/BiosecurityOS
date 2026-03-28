@@ -177,6 +177,14 @@ CREATE TABLE biosec.attachment (
     CONSTRAINT ck_attachment_3 CHECK (longitude IS NULL OR (longitude >= -180 AND longitude <= 180))
 );
 
+-- area_type
+CREATE TABLE biosec.area_type (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    code varchar(50) NOT NULL UNIQUE,
+    name varchar(100) NOT NULL,
+    display_order integer DEFAULT 0 NOT NULL
+);
+
 -- farm_area
 CREATE TABLE biosec.farm_area (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -184,7 +192,7 @@ CREATE TABLE biosec.farm_area (
     parent_area_id uuid,
     code varchar(50) NOT NULL,
     name varchar(255) NOT NULL,
-    area_type varchar(50) NOT NULL,
+    area_type_id uuid NOT NULL,
     clean_dirty_class varchar(30),
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamptz DEFAULT now() NOT NULL,
@@ -828,7 +836,7 @@ COMMENT ON COLUMN biosec.farm_area.farm_id IS $$ Trại mà khu vực này thu�
 COMMENT ON COLUMN biosec.farm_area.parent_area_id IS $$ Khu cha để tạo cấu trúc phân cấp, ví dụ Barn 1 thuộc Khu chăn nuôi. $$;
 COMMENT ON COLUMN biosec.farm_area.code IS $$ Mã khu vực duy nhất trong phạm vi một trại. $$;
 COMMENT ON COLUMN biosec.farm_area.name IS $$ Tên khu vực hiển thị, ví dụ Cổng, Nhà tắm, Khu nái đẻ. $$;
-COMMENT ON COLUMN biosec.farm_area.area_type IS $$ Loại khu vực để chuẩn hóa logic, ví dụ gate, shower, office, barn, quarantine. $$;
+COMMENT ON COLUMN biosec.farm_area.area_type_id IS $$ FK tới bảng area_type — loại khu vực (cổng, chuồng, kho cám, nhà tắm...). $$;
 COMMENT ON COLUMN biosec.farm_area.clean_dirty_class IS $$ Phân loại sạch/buffer/bẩn phục vụ kiểm soát luồng ATSH. $$;
 COMMENT ON COLUMN biosec.farm_area.is_active IS $$ Đánh dấu khu này còn được sử dụng hay đã ngưng. $$;
 COMMENT ON COLUMN biosec.farm_area.created_at IS $$ Thời điểm hệ thống tạo bản ghi. $$;
@@ -1185,6 +1193,7 @@ ALTER TABLE biosec.attachment ADD CONSTRAINT fk_attachment_uploaded_by_user_id F
 ALTER TABLE biosec.attachment ADD CONSTRAINT fk_attachment_parent_attachment_id FOREIGN KEY (parent_attachment_id) REFERENCES biosec.attachment(id) ON DELETE SET NULL;
 ALTER TABLE biosec.farm_area ADD CONSTRAINT fk_farm_area_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE CASCADE;
 ALTER TABLE biosec.farm_area ADD CONSTRAINT fk_farm_area_parent_area_id FOREIGN KEY (parent_area_id) REFERENCES biosec.farm_area(id) ON DELETE SET NULL;
+ALTER TABLE biosec.farm_area ADD CONSTRAINT fk_farm_area_area_type_id FOREIGN KEY (area_type_id) REFERENCES biosec.area_type(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.farm_route ADD CONSTRAINT fk_farm_route_farm_id FOREIGN KEY (farm_id) REFERENCES biosec.farm(id) ON DELETE CASCADE;
 ALTER TABLE biosec.farm_route ADD CONSTRAINT fk_farm_route_from_area_id FOREIGN KEY (from_area_id) REFERENCES biosec.farm_area(id) ON DELETE RESTRICT;
 ALTER TABLE biosec.farm_route ADD CONSTRAINT fk_farm_route_to_area_id FOREIGN KEY (to_area_id) REFERENCES biosec.farm_area(id) ON DELETE RESTRICT;
@@ -1411,6 +1420,7 @@ CREATE INDEX idx_attachment_uploaded_by_user_id ON biosec.attachment (uploaded_b
 CREATE INDEX idx_attachment_parent_attachment_id ON biosec.attachment (parent_attachment_id);
 CREATE INDEX idx_farm_area_farm_id ON biosec.farm_area (farm_id);
 CREATE INDEX idx_farm_area_parent_area_id ON biosec.farm_area (parent_area_id);
+CREATE INDEX idx_farm_area_area_type_id ON biosec.farm_area (area_type_id);
 CREATE INDEX idx_farm_route_farm_id ON biosec.farm_route (farm_id);
 CREATE INDEX idx_farm_route_from_area_id ON biosec.farm_route (from_area_id);
 CREATE INDEX idx_farm_route_to_area_id ON biosec.farm_route (to_area_id);

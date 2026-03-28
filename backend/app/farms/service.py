@@ -6,9 +6,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import AppUser, Farm
-from app.farms.models import ExternalRiskPoint, FarmArea, FarmRoute
+from app.farms.models import AreaType, ExternalRiskPoint, FarmArea, FarmRoute
 from app.farms.schemas import (
     AreaCreate,
+    AreaTypeOut,
     AreaUpdate,
     ExternalRiskPointCreate,
     FarmCreate,
@@ -106,6 +107,13 @@ async def update_farm(db: AsyncSession, farm_id: uuid.UUID, data: FarmUpdate) ->
         setattr(farm, field, value)
     await db.flush()
     return farm
+
+
+# ── Area Type ───────────────────────────────────────────────────
+
+async def list_area_types(db: AsyncSession) -> list[AreaType]:
+    result = await db.execute(select(AreaType).order_by(AreaType.display_order, AreaType.name))
+    return list(result.scalars().all())
 
 
 # ── Farm Area ───────────────────────────────────────────────────

@@ -28,7 +28,7 @@ import app.floorplans.models  # noqa: F401
 import app.scars.models  # noqa: F401
 import app.lessons.models  # noqa: F401
 
-from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint, RiskType
+from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint, RiskType, AreaType
 from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
 from app.assessments.models import Assessment, AssessmentItemResult
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
@@ -120,19 +120,84 @@ SEED_FARMS = [
 ]
 
 SEED_AREAS = [
-    ("GATE", "Cổng chính", "gate", "dirty"),
-    ("CLEAN", "Khu sạch", "production", "clean"),
-    ("BUFFER", "Khu đệm", "buffer", "buffer"),
-    ("DIRTY", "Khu bẩn", "logistics", "dirty"),
-    ("OFFICE", "Văn phòng", "office", None),
-    ("QUARANTINE", "Khu cách ly", "quarantine", "clean"),
-    ("SHOWER", "Nhà tắm sát trùng", "buffer_zone", "buffer"),
-    ("FEED_STORE", "Kho cám", "storage", "dirty"),
-    ("DEAD_PIG", "Khu xử lý heo chết", "yard", "dirty"),
+    # (suffix, name, area_type_code, clean_dirty_class)
+    ("GATE_MAIN",         "Cổng chính",                 "gate",                  "dirty"),
+    ("GATE_ALT1",         "Cổng phụ 1",                 "gate",                  "dirty"),
+    ("GUARDHOUSE",        "Nhà bảo vệ",                 "guardhouse",            "dirty"),
+    ("GATE_DISINFECT",    "Sát trùng cổng",             "gate_disinfection",     "dirty"),
+    ("PREBARN_DISINFECT", "Sát trùng trước chuồng",     "pre_barn_disinfection", "buffer"),
+    ("LIME_PIT",          "Hố vôi",                     "lime_pit",              "dirty"),
+    ("FOOTBATH",          "Nơi nhúng tay chân",         "footbath",              "buffer"),
+    ("WATER_TANK",        "Bể nước",                    "water_tank",            "buffer"),
+    ("YARD",              "Sân",                        "yard",                  "buffer"),
+    ("LIVING_QUARTERS",   "Khu sinh hoạt",              "living_quarters",       "buffer"),
+    ("FEED_STORE",        "Kho cám",                    "feed_storage",          "buffer"),
+    ("MED_STORE",         "Kho thuốc",                  "medicine_storage",      "buffer"),
+    ("EQUIP_STORE",       "Kho dụng cụ",                "equipment_storage",     "buffer"),
+    ("KITCHEN",           "Bếp",                        "kitchen",               "buffer"),
+    ("WEIGHBRIDGE_1",     "Cầu cân 1",                  "weighbridge",           "dirty"),
+    ("HOLD_PEN_1",        "Ô chờ 1",                    "holding_pen",           "dirty"),
+    ("HOLD_PEN_2",        "Ô chờ 2",                    "holding_pen",           "dirty"),
+    ("WEIGHBRIDGE_2",     "Cầu cân 2",                  "weighbridge",           "dirty"),
+    ("MANURE_PRESS",      "Nhà ép phân",                "manure_press",          "dirty"),
+    ("BIOGAS",            "Biogas",                     "biogas",                "dirty"),
+    ("CARCASS",           "Khu hủy xác heo",            "carcass_disposal",      "dirty"),
+    ("BARN",              "Chuồng",                     "barn",                  "clean"),
+    ("TOILET_GATE",       "Nhà vệ sinh cổng",           "toilet",                "dirty"),
+    ("TOILET_LIVING",     "Nhà vệ sinh khu sinh hoạt",  "toilet",                "buffer"),
+    ("SHOWER_GATE",       "Nhà tắm cổng",               "shower",                "dirty"),
+    ("SHOWER_LIVING",     "Nhà tắm khu sinh hoạt",      "shower",                "buffer"),
+    ("QUARANTINE",        "Nhà cách ly",                "quarantine",            "dirty"),
+]
+
+# ═══════════════════════════════════════════════════════════════
+# 2a. Area Types (reference data)
+# ═══════════════════════════════════════════════════════════════
+
+AREA_TYPE_DATA = [
+    ("gate",                  "Cổng",                       1),
+    ("guardhouse",            "Nhà bảo vệ",                 2),
+    ("gate_disinfection",     "Sát trùng cổng",             3),
+    ("pre_barn_disinfection", "Sát trùng trước chuồng",     4),
+    ("lime_pit",              "Hố vôi",                     5),
+    ("footbath",              "Nơi nhúng tay chân",         6),
+    ("water_tank",            "Bể nước",                    7),
+    ("yard",                  "Sân",                        8),
+    ("living_quarters",       "Khu sinh hoạt",              9),
+    ("feed_storage",          "Kho cám",                    10),
+    ("medicine_storage",      "Kho thuốc",                  11),
+    ("equipment_storage",     "Kho dụng cụ",                12),
+    ("kitchen",               "Bếp",                        13),
+    ("weighbridge",           "Cầu cân",                    14),
+    ("holding_pen",           "Ô chờ",                      15),
+    ("manure_press",          "Nhà ép phân",                16),
+    ("biogas",                "Biogas",                     17),
+    ("carcass_disposal",      "Khu hủy xác heo",            18),
+    ("barn",                  "Chuồng",                     19),
+    ("toilet",                "Nhà vệ sinh",                20),
+    ("shower",                "Nhà tắm",                    21),
+    ("quarantine",            "Khu cách ly",                22),
 ]
 
 
-async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
+async def _seed_area_types(db: AsyncSession) -> dict:
+    """Seed area_type lookup table. Returns dict code → AreaType."""
+    area_types: dict[str, AreaType] = {}
+    for code, name, order in AREA_TYPE_DATA:
+        result = await db.execute(select(AreaType).where(AreaType.code == code))
+        existing = result.scalar_one_or_none()
+        if existing:
+            area_types[code] = existing
+            continue
+        at = AreaType(code=code, name=name, display_order=order)
+        db.add(at)
+        area_types[code] = at
+    await db.flush()
+    print(f"  Created/loaded {len(area_types)} area types")
+    return area_types
+
+
+async def _seed_regions_and_farms(db: AsyncSession, users: dict, area_types: dict) -> tuple:
     regions, farms, areas = {}, {}, {}
 
     for code, name in SEED_REGIONS:
@@ -166,27 +231,28 @@ async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
     await db.flush()
 
     for farm_code, farm in farms.items():
-        for suffix, area_name, area_type, cdc in SEED_AREAS:
+        for suffix, area_name, area_type_code, cdc in SEED_AREAS:
             area_code = f"{farm_code}-{suffix}"
             result = await db.execute(select(FarmArea).where(FarmArea.code == area_code))
             if result.scalar_one_or_none():
                 continue
             area = FarmArea(
                 farm_id=farm.id, code=area_code, name=area_name,
-                area_type=area_type, clean_dirty_class=cdc, is_active=True,
+                area_type_id=area_types[area_type_code].id,
+                clean_dirty_class=cdc, is_active=True,
             )
             db.add(area)
             areas[(farm_code, suffix)] = area
     await db.flush()
 
     for farm_code, farm in farms.items():
-        gate = areas.get((farm_code, "GATE"))
-        clean = areas.get((farm_code, "CLEAN"))
-        buffer = areas.get((farm_code, "BUFFER"))
-        dirty = areas.get((farm_code, "DIRTY"))
-        shower = areas.get((farm_code, "SHOWER"))
+        gate = areas.get((farm_code, "GATE_MAIN"))
+        clean = areas.get((farm_code, "BARN"))
+        buffer = areas.get((farm_code, "PREBARN_DISINFECT"))
+        dirty = areas.get((farm_code, "GATE_DISINFECT"))
+        shower = areas.get((farm_code, "SHOWER_GATE"))
         feed_store = areas.get((farm_code, "FEED_STORE"))
-        dead_pig = areas.get((farm_code, "DEAD_PIG"))
+        dead_pig = areas.get((farm_code, "CARCASS"))
         quarantine = areas.get((farm_code, "QUARANTINE"))
         if clean and buffer and dirty:
             # Vehicle routes: dirty → buffer → clean (one way)
@@ -567,27 +633,27 @@ async def _seed_killer_events(db: AsyncSession, farms: dict, areas: dict, users:
     EVENTS = [
         # (farm_code, area_suffix, def_code, detector, summary, days_ago, status)
         # Current month
-        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Phát hiện thức ăn thừa không rõ nguồn gốc trong khu sạch", 3, "open"),
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe tải vào khu bẩn không qua sát trùng", 5, "open"),
-        ("FARM-C01", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Heo chết không được xử lý đúng quy trình trong 4h", 7, "open"),
-        ("FARM-N01", "DIRTY", "UNKNOWN_VISITOR", "farm_mgr", "Người lạ vào khu vực trại không đăng ký", 10, "under_review"),
+        ("FARM-N03", "BARN",           "SWILL_FEED",              "expert",    "Phát hiện thức ăn thừa không rõ nguồn gốc trong khu sạch", 3,   "open"),
+        ("FARM-S03", "GATE_DISINFECT", "RED_LINE_BREACH",         "farm_mgr",  "Xe tải vào khu bẩn không qua sát trùng",                   5,   "open"),
+        ("FARM-C01", "PREBARN_DISINFECT", "DEAD_PIG_PROTOCOL_BREACH", "expert","Heo chết không được xử lý đúng quy trình trong 4h",        7,   "open"),
+        ("FARM-N01", "GATE_DISINFECT", "UNKNOWN_VISITOR",         "farm_mgr",  "Người lạ vào khu vực trại không đăng ký",                  10,  "under_review"),
         # 1 month ago
-        ("FARM-S03", "CLEAN", "SWILL_FEED", "expert", "Nhân viên mang đồ ăn ngoài vào khu sạch", 35, "controlled"),
-        ("FARM-N03", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Xe lạ không đăng ký vào cổng trại", 40, "controlled"),
-        ("FARM-C01", "DIRTY", "RED_LINE_BREACH", "expert", "Nhân viên đi tắt qua khu bẩn không thay đồ", 42, "controlled"),
+        ("FARM-S03", "BARN",           "SWILL_FEED",              "expert",    "Nhân viên mang đồ ăn ngoài vào khu sạch",                  35,  "controlled"),
+        ("FARM-N03", "GATE_MAIN",      "UNKNOWN_VISITOR",         "farm_mgr",  "Xe lạ không đăng ký vào cổng trại",                        40,  "controlled"),
+        ("FARM-C01", "GATE_DISINFECT", "RED_LINE_BREACH",         "expert",    "Nhân viên đi tắt qua khu bẩn không thay đồ",               42,  "controlled"),
         # 2 months ago
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Vi phạm vùng đỏ lần 2 — xe cám không sát trùng", 65, "controlled"),
-        ("FARM-N03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Xác heo chết để quá 6h trong khu đệm", 70, "controlled"),
-        ("FARM-S02", "CLEAN", "SWILL_FEED", "farm_mgr", "Phát hiện thức ăn thừa gần chuồng nái", 75, "controlled"),
+        ("FARM-S03", "GATE_DISINFECT", "RED_LINE_BREACH",         "farm_mgr",  "Vi phạm vùng đỏ lần 2 — xe cám không sát trùng",           65,  "controlled"),
+        ("FARM-N03", "PREBARN_DISINFECT", "DEAD_PIG_PROTOCOL_BREACH", "expert","Xác heo chết để quá 6h trong khu đệm",                     70,  "controlled"),
+        ("FARM-S02", "BARN",           "SWILL_FEED",              "farm_mgr",  "Phát hiện thức ăn thừa gần chuồng nái",                    75,  "controlled"),
         # 3 months ago
-        ("FARM-N03", "DIRTY", "RED_LINE_BREACH", "expert", "Xe vận chuyển không qua hố sát trùng", 95, "controlled"),
-        ("FARM-C01", "CLEAN", "UNKNOWN_VISITOR", "farm_mgr", "Kỹ thuật viên bên ngoài vào khu sạch không tắm", 100, "controlled"),
+        ("FARM-N03", "GATE_DISINFECT", "RED_LINE_BREACH",         "expert",    "Xe vận chuyển không qua hố sát trùng",                     95,  "controlled"),
+        ("FARM-C01", "BARN",           "UNKNOWN_VISITOR",         "farm_mgr",  "Kỹ thuật viên bên ngoài vào khu sạch không tắm",           100, "controlled"),
         # 4 months ago
-        ("FARM-S03", "BUFFER", "DEAD_PIG_PROTOCOL_BREACH", "expert", "Vi phạm quy trình xử lý xác - chở ra ngoài", 125, "controlled"),
-        ("FARM-N01", "GATE", "UNKNOWN_VISITOR", "farm_mgr", "Người bán hàng rong vào khu vực cổng trại", 130, "controlled"),
+        ("FARM-S03", "PREBARN_DISINFECT", "DEAD_PIG_PROTOCOL_BREACH", "expert","Vi phạm quy trình xử lý xác - chở ra ngoài",              125, "controlled"),
+        ("FARM-N01", "GATE_MAIN",      "UNKNOWN_VISITOR",         "farm_mgr",  "Người bán hàng rong vào khu vực cổng trại",                130, "controlled"),
         # 5 months ago
-        ("FARM-N03", "CLEAN", "SWILL_FEED", "expert", "Thức ăn thừa từ nhà bếp đổ sát khu chăn nuôi", 155, "controlled"),
-        ("FARM-S03", "DIRTY", "RED_LINE_BREACH", "farm_mgr", "Xe máy nhân viên vào khu bẩn không rửa", 160, "controlled"),
+        ("FARM-N03", "BARN",           "SWILL_FEED",              "expert",    "Thức ăn thừa từ nhà bếp đổ sát khu chăn nuôi",             155, "controlled"),
+        ("FARM-S03", "GATE_DISINFECT", "RED_LINE_BREACH",         "farm_mgr",  "Xe máy nhân viên vào khu bẩn không rửa",                   160, "controlled"),
     ]
     for farm_code, area_suffix, def_code, detector, summary, days_ago, status in EVENTS:
         farm = farms.get(farm_code)
@@ -785,15 +851,14 @@ FLOORPLAN_DATA = [
 
 MARKER_TEMPLATES = [
     # (marker_type, label, x_percent, y_percent, area_suffix_to_link)
-    ("gate", "Cổng chính", 5.0, 50.0, "GATE"),
-    ("disinfection", "Nhà tắm sát trùng", 15.0, 50.0, "SHOWER"),
-    ("feed_storage", "Kho cám", 30.0, 20.0, "FEED_STORE"),
-    ("quarantine", "Khu cách ly", 80.0, 15.0, "QUARANTINE"),
-    ("dead_pig_zone", "Khu xử lý heo chết", 90.0, 80.0, "DEAD_PIG"),
-    ("checkpoint", "Khu đệm", 40.0, 50.0, "BUFFER"),
-    ("checkpoint", "Khu sạch", 65.0, 50.0, "CLEAN"),
-    ("checkpoint", "Khu bẩn", 20.0, 80.0, "DIRTY"),
-    ("checkpoint", "Văn phòng", 10.0, 20.0, "OFFICE"),
+    ("gate",          "Cổng chính",             5.0,  50.0, "GATE_MAIN"),
+    ("disinfection",  "Sát trùng cổng",         15.0, 50.0, "GATE_DISINFECT"),
+    ("disinfection",  "Sát trùng trước chuồng", 45.0, 50.0, "PREBARN_DISINFECT"),
+    ("feed_storage",  "Kho cám",                30.0, 20.0, "FEED_STORE"),
+    ("quarantine",    "Nhà cách ly",            80.0, 15.0, "QUARANTINE"),
+    ("dead_pig_zone", "Khu hủy xác heo",        90.0, 80.0, "CARCASS"),
+    ("checkpoint",    "Chuồng (khu sạch)",      65.0, 50.0, "BARN"),
+    ("checkpoint",    "Cầu cân 1 (khu bẩn)",   20.0, 80.0, "WEIGHBRIDGE_1"),
 ]
 
 
@@ -834,17 +899,17 @@ async def _seed_floorplans(db: AsyncSession, farms: dict, areas: dict, users: di
 
 SCAR_DATA = [
     # (farm_code, area_suffix, scar_type, title, description, confidence, event_date_offset_days, x, y)
-    ("FARM-N03", "CLEAN", "outbreak", "Ổ dịch khu sạch Q1/2025",
+    ("FARM-N03", "BARN",              "outbreak",         "Ổ dịch khu sạch Q1/2025",
      "Phát hiện ổ dịch PED tại khu sạch, nguồn lây nghi từ thức ăn nhiễm", "confirmed", 90, 45.0, 30.0),
-    ("FARM-N03", "DIRTY", "repeated_breach", "Vi phạm lặp lại cổng vào",
+    ("FARM-N03", "GATE_DISINFECT",    "repeated_breach",  "Vi phạm lặp lại cổng vào",
      "Xe tải vào trại liên tục không qua sát trùng đúng quy trình, 4 lần trong 2 tháng", "confirmed", 60, 5.0, 50.0),
-    ("FARM-S03", "DIRTY", "hotspot", "Hotspot thu nhận heo ngoài",
+    ("FARM-S03", "GATE_DISINFECT",    "hotspot",          "Hotspot thu nhận heo ngoài",
      "Khu vực nhận heo từ bên ngoài có tỷ lệ dương tính cao với PRRS", "probable", 45, 10.0, 70.0),
-    ("FARM-S03", "BUFFER", "near_miss", "Suýt lây nhiễm khu đệm",
+    ("FARM-S03", "PREBARN_DISINFECT", "near_miss",        "Suýt lây nhiễm khu đệm",
      "Phát hiện kịp thời nhân viên mang thức ăn ngoài vào khu đệm", "suspected", 30, 40.0, 55.0),
-    ("FARM-C01", "BUFFER", "structural_flaw", "Lỗ hổng hàng rào khu đệm",
+    ("FARM-C01", "PREBARN_DISINFECT", "structural_flaw",  "Lỗ hổng hàng rào khu đệm",
      "Hàng rào khu đệm bị hư hỏng, tạo lối đi tắt vào khu sạch", "confirmed", 20, 55.0, 35.0),
-    ("FARM-N01", "DIRTY", "repeated_breach", "Khách không đăng ký lặp lại",
+    ("FARM-N01", "GATE_DISINFECT",    "repeated_breach",  "Khách không đăng ký lặp lại",
      "Người lạ xâm nhập khu vực trại 3 lần trong 1 tháng", "probable", 15, 8.0, 48.0),
 ]
 
@@ -1026,8 +1091,11 @@ async def seed_all() -> None:
         print("\n[1/11] Seeding users...")
         users = await seed_users(db)
 
+        print("\n[2a/11] Seeding area types...")
+        area_types = await _seed_area_types(db)
+
         print("\n[2/11] Seeding regions & farms...")
-        _regions, farms, areas = await _seed_regions_and_farms(db, users)
+        _regions, farms, areas = await _seed_regions_and_farms(db, users, area_types)
 
         print("\n[3/11] Seeding scorecard templates...")
         templates = await _seed_scorecards(db)

@@ -156,7 +156,36 @@ SET name = EXCLUDED.name,
     is_active = EXCLUDED.is_active,
     note = EXCLUDED.note;
 
--- 5) Định nghĩa killer metric mẫu
+-- 5) Loại khu vực trại
+INSERT INTO biosec.area_type (code, name, display_order)
+VALUES
+    ('gate',                  'Cổng',                       1),
+    ('guardhouse',            'Nhà bảo vệ',                 2),
+    ('gate_disinfection',     'Sát trùng cổng',             3),
+    ('pre_barn_disinfection', 'Sát trùng trước chuồng',     4),
+    ('lime_pit',              'Hố vôi',                     5),
+    ('footbath',              'Nơi nhúng tay chân',         6),
+    ('water_tank',            'Bể nước',                    7),
+    ('yard',                  'Sân',                        8),
+    ('living_quarters',       'Khu sinh hoạt',              9),
+    ('feed_storage',          'Kho cám',                    10),
+    ('medicine_storage',      'Kho thuốc',                  11),
+    ('equipment_storage',     'Kho dụng cụ',                12),
+    ('kitchen',               'Bếp',                        13),
+    ('weighbridge',           'Cầu cân',                    14),
+    ('holding_pen',           'Ô chờ',                      15),
+    ('manure_press',          'Nhà ép phân',                16),
+    ('biogas',                'Biogas',                     17),
+    ('carcass_disposal',      'Khu hủy xác heo',            18),
+    ('barn',                  'Chuồng',                     19),
+    ('toilet',                'Nhà vệ sinh',                20),
+    ('shower',                'Nhà tắm',                    21),
+    ('quarantine',            'Khu cách ly',                22)
+ON CONFLICT (code) DO UPDATE
+SET name = EXCLUDED.name,
+    display_order = EXCLUDED.display_order;
+
+-- 6) Định nghĩa killer metric mẫu
 INSERT INTO biosec.killer_metric_definition (code, name, description, source_type, severity_level, default_case_priority, active_flag)
 VALUES
     (

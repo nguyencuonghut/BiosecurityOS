@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.farms.models import RiskType
+from app.farms.models import RiskType, AreaType
 
 
 # ── Farm ────────────────────────────────────────────────────────
@@ -65,12 +65,23 @@ class FarmOut(BaseModel):
     updated_at: datetime
 
 
+# ── Area Type ───────────────────────────────────────────────────
+
+class AreaTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    code: str
+    name: str
+    display_order: int
+
+
 # ── Farm Area ───────────────────────────────────────────────────
 
 class AreaCreate(BaseModel):
     code: str = Field(max_length=50)
     name: str = Field(max_length=255)
-    area_type: str = Field(max_length=50)
+    area_type_id: uuid.UUID
     parent_area_id: uuid.UUID | None = None
     clean_dirty_class: str | None = Field(default=None, pattern=r"^(clean|buffer|dirty)$")
     is_active: bool = True
@@ -78,7 +89,7 @@ class AreaCreate(BaseModel):
 
 class AreaUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
-    area_type: str | None = Field(default=None, max_length=50)
+    area_type_id: uuid.UUID | None = None
     parent_area_id: uuid.UUID | None = None
     clean_dirty_class: str | None = Field(default=None, pattern=r"^(clean|buffer|dirty)$")
     is_active: bool | None = None
@@ -92,11 +103,17 @@ class AreaOut(BaseModel):
     parent_area_id: uuid.UUID | None
     code: str
     name: str
-    area_type: str
+    area_type_id: uuid.UUID
+    area_type_rel: AreaTypeOut | None = Field(default=None, exclude=True)
     clean_dirty_class: str | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def area_type_name(self) -> str:
+        return self.area_type_rel.name if self.area_type_rel else ""
 
 
 # ── Farm Route ──────────────────────────────────────────────────

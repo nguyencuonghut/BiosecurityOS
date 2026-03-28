@@ -22,6 +22,13 @@ export async function updateFarm(id, payload) {
   return data.data
 }
 
+// ── Area Types ─────────────────────────────────────────────────
+
+export async function listAreaTypes() {
+  const { data } = await apiClient.get('/farms/area-types')
+  return data.data
+}
+
 // ── Area ───────────────────────────────────────────────────────
 
 export async function listAreas(farmId) {

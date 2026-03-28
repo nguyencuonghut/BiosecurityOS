@@ -279,6 +279,15 @@ Bảng hồ sơ gốc của từng trại.
 | created_at | timestamptz | Có | Thời điểm hệ thống tạo bản ghi. |
 | updated_at | timestamptz | Có | Thời điểm cập nhật gần nhất. |
 
+### `area_type`
+Bảng danh mục loại khu vực dùng trong quản lý trại.
+| Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |
+|---|---|---:|---|
+| id | uuid | Có | Khóa chính (PK) của bảng. |
+| code | varchar(50) | Có | Mã định danh duy nhất (slug), ví dụ gate, barn, shower, feed_storage. |
+| name | varchar(100) | Có | Tên hiển thị tiếng Việt: Cổng, Chuồng, Nhà tắm, Kho cám... |
+| display_order | integer | Có | Thứ tự hiển thị trong danh sách. |
+
 ### `farm_area`
 Bảng cấu trúc khu vực bên trong trại.
 | Cột | Kiểu gợi ý | Bắt buộc | Ghi chú |
@@ -287,8 +296,8 @@ Bảng cấu trúc khu vực bên trong trại.
 | farm_id | uuid | Có | Trại mà khu vực này thuộc về. |
 | parent_area_id | uuid | Không | Khu cha để tạo cấu trúc phân cấp, ví dụ Barn 1 thuộc Khu chăn nuôi. |
 | code | varchar(50) | Có | Mã khu vực duy nhất trong phạm vi một trại. |
-| name | varchar(255) | Có | Tên khu vực hiển thị, ví dụ Cổng, Nhà tắm, Khu nái đẻ. |
-| area_type | varchar(50) | Có | Loại khu vực để chuẩn hóa logic, ví dụ gate, shower, office, barn, quarantine. |
+| name | varchar(255) | Có | Tên khu vực hiển thị, ví dụ Cổng chính, Nhà tắm khu sinh hoạt. |
+| area_type_id | uuid | Có | FK tới bảng area_type — loại khu vực (Cổng, Chuồng, Kho cám, Nhà tắm...). |
 | clean_dirty_class | varchar(30) | Không | Phân loại sạch/buffer/bẩn phục vụ kiểm soát luồng ATSH. |
 | is_active | boolean | Có | Đánh dấu khu này còn được sử dụng hay đã ngưng. |
 | created_at | timestamptz | Có | Thời điểm hệ thống tạo bản ghi. |
