@@ -340,7 +340,7 @@ Bảng điểm nguy cơ bên ngoài ảnh hưởng tới trại.
 |---|---|---:|---|
 | id | uuid | Có | Khóa chính (PK) của bảng. |
 | farm_id | uuid | Có | Trại bị ảnh hưởng bởi điểm rủi ro bên ngoài này. |
-| risk_type | varchar(50) | Có | Loại rủi ro bên ngoài, ví dụ bãi rác, lò mổ, khu tiêu hủy, ao nước thải. |
+| risk_type | external_risk_point_risk_type_enum | Có | Loại rủi ro bên ngoài (PostgreSQL ENUM): market \| dump \| slaughterhouse \| disposal_site \| wastewater \| farm \| water_source \| road \| other |
 | name | varchar(255) | Không | Tên hoặc mô tả ngắn của điểm rủi ro. |
 | latitude | numeric(10,7) | Có | Vĩ độ của điểm rủi ro bên ngoài. |
 | longitude | numeric(10,7) | Có | Kinh độ của điểm rủi ro bên ngoài. |

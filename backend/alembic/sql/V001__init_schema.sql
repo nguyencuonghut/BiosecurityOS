@@ -242,10 +242,13 @@ CREATE TABLE biosec.floorplan_marker (
 );
 
 -- external_risk_point
+CREATE TYPE biosec.external_risk_point_risk_type_enum AS ENUM (
+    'market', 'dump', 'slaughterhouse', 'disposal_site', 'wastewater', 'farm', 'water_source', 'road', 'other'
+);
 CREATE TABLE biosec.external_risk_point (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     farm_id uuid NOT NULL,
-    risk_type varchar(50) NOT NULL,
+    risk_type biosec.external_risk_point_risk_type_enum NOT NULL,
     name varchar(255),
     latitude numeric(10,7) NOT NULL,
     longitude numeric(10,7) NOT NULL,
@@ -863,7 +866,7 @@ COMMENT ON COLUMN biosec.floorplan_marker.metadata_json IS $$ Thông tin mở r�
 COMMENT ON TABLE biosec.external_risk_point IS $$ Bảng điểm nguy cơ bên ngoài ảnh hưởng tới trại. $$;
 COMMENT ON COLUMN biosec.external_risk_point.id IS $$ Khóa chính (PK) của bảng. $$;
 COMMENT ON COLUMN biosec.external_risk_point.farm_id IS $$ Trại bị ảnh hưởng bởi điểm rủi ro bên ngoài này. $$;
-COMMENT ON COLUMN biosec.external_risk_point.risk_type IS $$ Loại rủi ro bên ngoài, ví dụ bãi rác, lò mổ, khu tiêu hủy, ao nước thải. $$;
+COMMENT ON COLUMN biosec.external_risk_point.risk_type IS $$ Loại rủi ro bên ngoài (PostgreSQL ENUM: external_risk_point_risk_type_enum): market | dump | slaughterhouse | disposal_site | wastewater | farm | water_source | road | other $$;
 COMMENT ON COLUMN biosec.external_risk_point.name IS $$ Tên hoặc mô tả ngắn của điểm rủi ro. $$;
 COMMENT ON COLUMN biosec.external_risk_point.latitude IS $$ Vĩ độ của điểm rủi ro bên ngoài. $$;
 COMMENT ON COLUMN biosec.external_risk_point.longitude IS $$ Kinh độ của điểm rủi ro bên ngoài. $$;

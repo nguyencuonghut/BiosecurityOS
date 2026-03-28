@@ -3,7 +3,9 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from app.farms.models import RiskType
 
 
 # ── Farm ────────────────────────────────────────────────────────
@@ -123,8 +125,21 @@ class RouteOut(BaseModel):
 
 # ── External Risk Point ─────────────────────────────────────────
 
+RISK_TYPE_LABELS: dict[RiskType, str] = {
+    RiskType.MARKET: "Chợ gia súc",
+    RiskType.DUMP: "Bãi rác",
+    RiskType.SLAUGHTERHOUSE: "Lò mổ",
+    RiskType.DISPOSAL_SITE: "Khu tiêu hủy",
+    RiskType.WASTEWATER: "Ao nước thải",
+    RiskType.FARM: "Trại chăn nuôi lân cận",
+    RiskType.WATER_SOURCE: "Nguồn nước",
+    RiskType.ROAD: "Đường giao thông lớn",
+    RiskType.OTHER: "Khác",
+}
+
+
 class ExternalRiskPointCreate(BaseModel):
-    risk_type: str = Field(max_length=50)
+    risk_type: RiskType
     name: str | None = Field(default=None, max_length=255)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -138,7 +153,7 @@ class ExternalRiskPointOut(BaseModel):
 
     id: uuid.UUID
     farm_id: uuid.UUID
-    risk_type: str
+    risk_type: RiskType
     name: str | None
     latitude: float
     longitude: float
@@ -147,3 +162,8 @@ class ExternalRiskPointOut(BaseModel):
     confidence_level: str
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def risk_type_label(self) -> str:
+        return RISK_TYPE_LABELS.get(self.risk_type, self.risk_type.value)

@@ -28,7 +28,7 @@ import app.floorplans.models  # noqa: F401
 import app.scars.models  # noqa: F401
 import app.lessons.models  # noqa: F401
 
-from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint
+from app.farms.models import FarmArea, FarmRoute, ExternalRiskPoint, RiskType
 from app.scorecards.models import ScorecardTemplate, ScorecardSection, ScorecardItem
 from app.assessments.models import Assessment, AssessmentItemResult
 from app.killer_metrics.models import KillerMetricDefinition, KillerMetricEvent
@@ -241,13 +241,13 @@ async def _seed_regions_and_farms(db: AsyncSession, users: dict) -> tuple:
         if not farm:
             continue
         db.add(ExternalRiskPoint(
-            farm_id=farm.id, risk_type="market",
+            farm_id=farm.id, risk_type=RiskType.MARKET,
             name="Chợ gia súc lân cận", latitude=farm.latitude + Decimal("0.01"),
             longitude=farm.longitude + Decimal("0.01"), distance_m=800,
             note="Chợ buôn bán gia súc, hoạt động hàng tuần", confidence_level="confirmed",
         ))
         db.add(ExternalRiskPoint(
-            farm_id=farm.id, risk_type="dump",
+            farm_id=farm.id, risk_type=RiskType.DUMP,
             name="Bãi rác lộ thiên", latitude=farm.latitude - Decimal("0.005"),
             longitude=farm.longitude + Decimal("0.008"), distance_m=1200,
             note="Bãi rác có nguy cơ thu hút động vật gây bệnh", confidence_level="probable",

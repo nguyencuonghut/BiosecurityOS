@@ -1,12 +1,25 @@
 """ORM models for Farm sub-entities (Sprint 02)."""
 
+import enum
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, text
+from sqlalchemy import Boolean, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models_base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+
+class RiskType(str, enum.Enum):
+    MARKET = "market"
+    DUMP = "dump"
+    SLAUGHTERHOUSE = "slaughterhouse"
+    DISPOSAL_SITE = "disposal_site"
+    WASTEWATER = "wastewater"
+    FARM = "farm"
+    WATER_SOURCE = "water_source"
+    ROAD = "road"
+    OTHER = "other"
 
 
 class FarmArea(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -55,7 +68,11 @@ class ExternalRiskPoint(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     farm_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("biosec.farm.id", ondelete="CASCADE"), nullable=False
     )
-    risk_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    risk_type: Mapped[RiskType] = mapped_column(
+        SAEnum(RiskType, name="external_risk_point_risk_type_enum", schema="biosec",
+               create_type=False, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     latitude: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)
     longitude: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)

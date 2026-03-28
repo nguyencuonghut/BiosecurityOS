@@ -36,6 +36,18 @@ const form = ref({
   confidence_level: 'suspected',
 })
 
+const riskTypeOptions = [
+  { label: 'Chợ gia súc', value: 'market' },
+  { label: 'Bãi rác', value: 'dump' },
+  { label: 'Lò mổ', value: 'slaughterhouse' },
+  { label: 'Khu tiêu hủy', value: 'disposal_site' },
+  { label: 'Ao nước thải', value: 'wastewater' },
+  { label: 'Trại chăn nuôi lân cận', value: 'farm' },
+  { label: 'Nguồn nước', value: 'water_source' },
+  { label: 'Đường giao thông lớn', value: 'road' },
+  { label: 'Khác', value: 'other' },
+]
+
 const confidenceOptions = [
   { label: 'Nghi ngờ', value: 'suspected' },
   { label: 'Có thể', value: 'probable' },
@@ -43,14 +55,14 @@ const confidenceOptions = [
 ]
 
 function openCreate() {
-  form.value = { risk_type: '', name: '', latitude: null, longitude: null, distance_m: null, note: '', confidence_level: 'suspected' }
+  form.value = { risk_type: null, name: '', latitude: null, longitude: null, distance_m: null, note: '', confidence_level: 'suspected' }
   errorMsg.value = ''
   showDialog.value = true
 }
 
 async function onSubmit() {
   errorMsg.value = ''
-  if (!form.value.risk_type?.trim() || form.value.latitude == null || form.value.longitude == null) {
+  if (!form.value.risk_type || form.value.latitude == null || form.value.longitude == null) {
     errorMsg.value = 'Vui lòng nhập: Loại rủi ro, Vĩ độ, Kinh độ.'
     return
   }
@@ -82,7 +94,9 @@ async function onSubmit() {
     </div>
 
     <DataTable :value="farmStore.riskPoints" stripedRows v-if="farmStore.riskPoints.length">
-      <Column header="Loại" field="risk_type" style="width: 8rem" />
+      <Column header="Loại" style="width: 10rem">
+        <template #body="{ data }">{{ data.risk_type_label }}</template>
+      </Column>
       <Column header="Tên" field="name" />
       <Column header="Khoảng cách" style="width: 8rem">
         <template #body="{ data }">{{ data.distance_m != null ? `${data.distance_m}m` : '—' }}</template>
@@ -108,7 +122,7 @@ async function onSubmit() {
       <div class="form-fields">
         <div class="field">
           <label>Loại rủi ro *</label>
-          <InputText v-model="form.risk_type" placeholder="VD: slaughterhouse, market" :fluid="true" />
+          <Select v-model="form.risk_type" :options="riskTypeOptions" optionLabel="label" optionValue="value" placeholder="Chọn loại rủi ro" :fluid="true" />
         </div>
         <div class="field">
           <label>Tên</label>
