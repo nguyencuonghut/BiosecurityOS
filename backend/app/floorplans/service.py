@@ -99,7 +99,10 @@ async def approve_floorplan(
     )
     for active_fp in active_result.scalars().all():
         active_fp.status = "archived"
-        active_fp.effective_to = fp.effective_from
+        # effective_to phải >= effective_from của chính nó
+        from datetime import date as _date
+        close_date = max(fp.effective_from, active_fp.effective_from)
+        active_fp.effective_to = close_date
 
     fp.status = "active"
     fp.approved_by = approved_by_user_id

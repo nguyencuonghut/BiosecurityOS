@@ -40,6 +40,7 @@ export const useFarmStore = defineStore('farm', () => {
   }
 
   async function fetchFarm(id) {
+    currentFarm.value = null  // clear ngay để tránh stale data trên child components
     loading.value = true
     try {
       currentFarm.value = await farmService.getFarm(id)

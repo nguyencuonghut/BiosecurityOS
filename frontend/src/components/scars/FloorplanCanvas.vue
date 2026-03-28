@@ -130,24 +130,39 @@ function displayY(m) {
   return m.y_percent
 }
 
-// ── Marker icon & color mapping (biosecurity context) ─────────
-// Keys = area_type from DB: gate, production, buffer, logistics,
-//         office, quarantine, buffer_zone, storage, yard
-// Uses MDI (Material Design Icons) for industry-specific icons
+// ── Marker icon & color mapping — 22 area_type codes ──────────
+// PrimeIcons (pi-*) — bundled with PrimeVue, always available
 const markerConfig = {
-  gate:        { icon: 'mdi-gate',                    color: '#64748b', label: 'Cổng' },
-  production:  { icon: 'mdi-pig-variant-outline',     color: '#22c55e', label: 'Khu sạch' },
-  buffer:      { icon: 'mdi-shield-half-full',        color: '#f59e0b', label: 'Khu đệm' },
-  logistics:   { icon: 'mdi-virus',                   color: '#ef4444', label: 'Khu bẩn' },
-  office:      { icon: 'mdi-office-building-outline', color: '#6366f1', label: 'Văn phòng' },
-  quarantine:  { icon: 'mdi-shield-alert-outline',    color: '#dc2626', label: 'Cách ly' },
-  buffer_zone: { icon: 'mdi-shower-head',             color: '#0ea5e9', label: 'Sát trùng' },
-  storage:     { icon: 'mdi-warehouse',               color: '#a855f7', label: 'Kho cám' },
-  yard:        { icon: 'mdi-skull-outline',           color: '#78716c', label: 'Xử lý xác' },
+  gate:                  { icon: 'pi pi-sign-in',           color: '#64748b', label: 'Cổng' },
+  guardhouse:            { icon: 'pi pi-shield',            color: '#475569', label: 'Nhà bảo vệ' },
+  gate_disinfection:     { icon: 'pi pi-filter',            color: '#f59e0b', label: 'Sát trùng cổng' },
+  pre_barn_disinfection: { icon: 'pi pi-filter-fill',       color: '#d97706', label: 'Sát trùng trước chuồng' },
+  lime_pit:              { icon: 'pi pi-circle',            color: '#84cc16', label: 'Hố vôi' },
+  footbath:              { icon: 'pi pi-sort-down',         color: '#22d3ee', label: 'Nơi nhúng tay chân' },
+  water_tank:            { icon: 'pi pi-cloud',             color: '#38bdf8', label: 'Bể nước' },
+  yard:                  { icon: 'pi pi-th-large',          color: '#a3a3a3', label: 'Sân' },
+  living_quarters:       { icon: 'pi pi-home',              color: '#6366f1', label: 'Khu sinh hoạt' },
+  feed_storage:          { icon: 'pi pi-box',               color: '#f97316', label: 'Kho cám' },
+  medicine_storage:      { icon: 'pi pi-heart',             color: '#ec4899', label: 'Kho thuốc' },
+  equipment_storage:     { icon: 'pi pi-wrench',            color: '#8b5cf6', label: 'Kho dụng cụ' },
+  kitchen:               { icon: 'pi pi-star',              color: '#fb923c', label: 'Bếp' },
+  weighbridge:           { icon: 'pi pi-arrows-h',          color: '#0ea5e9', label: 'Cầu cân' },
+  holding_pen:           { icon: 'pi pi-stop-circle',       color: '#94a3b8', label: 'Ô chờ' },
+  manure_press:          { icon: 'pi pi-arrow-down',        color: '#78716c', label: 'Nhà ép phân' },
+  biogas:                { icon: 'pi pi-bolt',              color: '#4ade80', label: 'Biogas' },
+  carcass_disposal:      { icon: 'pi pi-exclamation-circle',color: '#dc2626', label: 'Khu hủy xác heo' },
+  barn:                  { icon: 'pi pi-check-circle',      color: '#16a34a', label: 'Chuồng' },
+  toilet:                { icon: 'pi pi-user',              color: '#9ca3af', label: 'Nhà vệ sinh' },
+  shower:                { icon: 'pi pi-cloud-download',    color: '#0284c7', label: 'Nhà tắm' },
+  quarantine:            { icon: 'pi pi-ban',               color: '#ef4444', label: 'Khu cách ly' },
+  // Legacy marker_type values used in seeder MARKER_TEMPLATES
+  disinfection:          { icon: 'pi pi-filter',            color: '#f59e0b', label: 'Sát trùng' },
+  dead_pig_zone:         { icon: 'pi pi-exclamation-circle',color: '#dc2626', label: 'Khu hủy xác' },
+  checkpoint:            { icon: 'pi pi-map-marker',        color: '#22c55e', label: 'Điểm kiểm tra' },
 }
 
 function getMarkerIcon(type) {
-  return markerConfig[type]?.icon || 'mdi-map-marker'
+  return markerConfig[type]?.icon || 'pi pi-map-marker'
 }
 
 function getMarkerColor(type) {
@@ -315,7 +330,7 @@ const markerLegendItems = computed(() => {
         @mouseenter="hoveredMarker = m.id"
         @mouseleave="hoveredMarker = null"
       >
-        <i :class="'mdi ' + getMarkerIcon(m.marker_type)" />
+        <i :class="getMarkerIcon(m.marker_type)" />
         <!-- Tooltip -->
         <div class="marker-tooltip" v-if="hoveredMarker === m.id && !draggingMarker">
           <div class="tooltip-title">{{ m.label }}</div>
@@ -360,7 +375,7 @@ const markerLegendItems = computed(() => {
         <span class="legend-title">Khu vực:</span>
         <span v-for="item in markerLegendItems" :key="item.type" class="legend-item">
           <span class="legend-dot" :style="{ background: item.color }">
-            <i :class="'mdi ' + item.icon" style="font-size: 0.5rem; color: #fff;" />
+            <i :class="item.icon" style="font-size: 0.5rem; color: #fff;" />
           </span>
           {{ item.label }}
         </span>

@@ -21,6 +21,7 @@ import FarmDashboardPanel from '@/components/dashboard/FarmDashboardPanel.vue'
 import { useFarmStore } from '@/stores/farm.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useTrustScoreStore } from '@/stores/trustScore.js'
+import * as floorplanService from '@/services/floorplanService.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +32,7 @@ const trustScoreStore = useTrustScoreStore()
 
 const activeTab = ref('overview')
 const showEditDialog = ref(false)
+const floorplanCount = ref(0)
 
 const farm = computed(() => farmStore.currentFarm)
 
@@ -42,6 +44,7 @@ onMounted(async () => {
     farmStore.fetchRoutes(route.params.id),
     farmStore.fetchRiskPoints(route.params.id),
     trustScoreStore.fetchLatest(route.params.id),
+    floorplanService.listFloorplans(route.params.id).then(fps => { floorplanCount.value = fps.length }).catch(() => {}),
   ])
 })
 
@@ -168,7 +171,7 @@ async function onSaved() {
         <Tab value="0">Khu vực ({{ farmStore.areas.length }})</Tab>
         <Tab value="1">Lộ trình ({{ farmStore.routes.length }})</Tab>
         <Tab value="2">Điểm rủi ro ({{ farmStore.riskPoints.length }})</Tab>
-        <Tab value="3">Floorplan</Tab>
+        <Tab value="3">Floorplan ({{ floorplanCount }})</Tab>
         <Tab value="4">Bài học</Tab>
       </TabList>
       <TabPanels>

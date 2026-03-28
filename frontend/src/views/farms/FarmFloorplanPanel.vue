@@ -66,6 +66,12 @@ const areaTypeMap = computed(() => {
   return map
 })
 
+const areaTypeCodeMap = computed(() => {
+  const map = {}
+  for (const t of farmStore.areaTypes) map[t.id] = t.code
+  return map
+})
+
 onMounted(async () => {
   await fetchFloorplans()
   // Ensure areas, routes and area types are loaded
@@ -224,7 +230,7 @@ async function submitPlaceMarker() {
   try {
     await floorplanService.createMarker(activeFloorplanId.value, {
       area_id: area.id,
-      marker_type: 'other',
+      marker_type: (area.area_type_id && areaTypeCodeMap.value[area.area_type_id]) || 'other',
       label: area.name,
       x_percent: placingCoords.value.x_percent,
       y_percent: placingCoords.value.y_percent,

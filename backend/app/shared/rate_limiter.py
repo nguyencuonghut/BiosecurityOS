@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse
 
 from app.shared.cache import get_redis
 
-_GLOBAL_LIMIT = 100
+_GLOBAL_LIMIT = 300
 _GLOBAL_WINDOW = 60
-_UPLOAD_LIMIT = 30
+_UPLOAD_LIMIT = 60
 _UPLOAD_WINDOW = 60
 
 
@@ -27,6 +27,12 @@ def _get_client_id(request: Request) -> str:
 
 async def rate_limit_middleware(request: Request, call_next):
     """Check global + upload rate limits before processing."""
+    # CORS headers to include on error responses (browser blocks 4xx without them)
+    origin = request.headers.get("origin", "")
+    cors_headers = {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+    } if origin else {}
     client_id = _get_client_id(request)
 
     try:
@@ -47,7 +53,7 @@ async def rate_limit_middleware(request: Request, call_next):
                         "message": f"Rate limit exceeded. Try again in {ttl}s.",
                     }
                 },
-                headers={"Retry-After": str(ttl)},
+                headers={"Retry-After": str(ttl), **cors_headers},
             )
 
         # Upload rate limit (POST with multipart)
@@ -70,7 +76,7 @@ async def rate_limit_middleware(request: Request, call_next):
                             "message": f"Upload rate limit exceeded. Try again in {ttl}s.",
                         }
                     },
-                    headers={"Retry-After": str(ttl)},
+                    headers={"Retry-After": str(ttl), **cors_headers},
                 )
     except Exception:
         # If Redis is down, allow request through (fail-open)
