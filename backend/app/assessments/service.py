@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.assessments.models import Assessment, AssessmentAttachment, AssessmentItemResult
+from app.assessments.models import Assessment, AssessmentAttachment, AssessmentItemResult, AssessmentStatus
 from app.assessments.schemas import (
     AssessmentAttachmentCreate,
     AssessmentCreate,
@@ -23,11 +23,11 @@ from app.shared.exceptions import (
 )
 
 # ── Valid state transitions ─────────────────────────────────────
-VALID_TRANSITIONS: dict[str, list[str]] = {
-    "draft": ["submitted"],
-    "submitted": ["reviewed"],
-    "reviewed": ["locked"],
-    "locked": [],
+VALID_TRANSITIONS: dict[AssessmentStatus, list[AssessmentStatus]] = {
+    AssessmentStatus.DRAFT:     [AssessmentStatus.SUBMITTED],
+    AssessmentStatus.SUBMITTED: [AssessmentStatus.REVIEWED],
+    AssessmentStatus.REVIEWED:  [AssessmentStatus.LOCKED],
+    AssessmentStatus.LOCKED:    [],
 }
 
 # ── Section type → score field mapping ──────────────────────────
@@ -89,7 +89,7 @@ async def list_assessments(
     *,
     farm_id: uuid.UUID | None = None,
     assessment_type: str | None = None,
-    status: str | None = None,
+    status: AssessmentStatus | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
     page: int = 1,
@@ -150,7 +150,7 @@ async def create_assessment(
         assessment_date=data.assessment_date or func.now(),
         performed_by_user_id=user.id,
         performed_by_name_snapshot=user.full_name or user.username,
-        status="draft",
+        status=AssessmentStatus.DRAFT,
     )
     db.add(assessment)
     await db.flush()
@@ -166,7 +166,7 @@ async def update_assessment(
     db: AsyncSession, assessment_id: uuid.UUID, data: AssessmentUpdate
 ) -> Assessment:
     obj = await _get_assessment(db, assessment_id)
-    if obj.status != "draft":
+    if obj.status != AssessmentStatus.DRAFT:
         raise ValidationException("Chỉ có thể sửa assessment ở trạng thái draft.")
 
     update_data = data.model_dump(exclude_unset=True)
@@ -183,7 +183,7 @@ async def bulk_upsert_item_results(
     db: AsyncSession, assessment_id: uuid.UUID, data: BulkUpsertRequest
 ) -> list[AssessmentItemResult]:
     obj = await _get_assessment(db, assessment_id)
-    if obj.status != "draft":
+    if obj.status != AssessmentStatus.DRAFT:
         raise ValidationException("Chỉ có thể cập nhật kết quả khi assessment ở trạng thái draft.")
 
     # Fetch template sections → items to validate item belongs to template
@@ -332,11 +332,11 @@ async def calculate_scores(db: AsyncSession, assessment_id: uuid.UUID) -> Assess
 async def submit_assessment(db: AsyncSession, assessment_id: uuid.UUID) -> Assessment:
     """Transition draft → submitted and calculate scores."""
     obj = await _get_assessment(db, assessment_id)
-    _validate_transition(obj.status, "submitted")
+    _validate_transition(obj.status, AssessmentStatus.SUBMITTED)
 
     # Calculate scores before submitting
     obj = await calculate_scores(db, assessment_id)
-    obj.status = "submitted"
+    obj.status = AssessmentStatus.SUBMITTED
     obj.version += 1
     await db.flush()
     await db.refresh(obj)
@@ -348,7 +348,7 @@ async def submit_assessment(db: AsyncSession, assessment_id: uuid.UUID) -> Asses
 async def change_status(
     db: AsyncSession,
     assessment_id: uuid.UUID,
-    target_status: str,
+    target_status: AssessmentStatus,
     expected_version: int,
 ) -> Assessment:
     """Generic state transition with optimistic lock check."""

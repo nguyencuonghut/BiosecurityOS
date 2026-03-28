@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assessments import service
-from app.assessments.models import AssessmentType
+from app.assessments.models import AssessmentType, AssessmentStatus
 from app.assessments.schemas import (
     AssessmentAttachmentCreate,
     AssessmentAttachmentOut,
@@ -38,7 +38,7 @@ async def list_assessments(
     _perm: Annotated[None, require_permission("ASSESSMENT_READ")],
     farm_id: Annotated[str | None, Query()] = None,
     assessment_type: Annotated[AssessmentType | None, Query()] = None,
-    status: Annotated[str | None, Query()] = None,
+    status: Annotated[AssessmentStatus | None, Query()] = None,
     date_from: Annotated[str | None, Query()] = None,
     date_to: Annotated[str | None, Query()] = None,
 ):
@@ -170,6 +170,11 @@ async def change_status(
     if not target or version is None:
         from app.shared.exceptions import ValidationException
         raise ValidationException("Phải cung cấp 'status' và 'version'.")
-    obj = await service.change_status(db, uuid.UUID(assessment_id), target, version)
+    try:
+        target_enum = AssessmentStatus(target)
+    except ValueError:
+        from app.shared.exceptions import ValidationException
+        raise ValidationException(f"Trạng thái không hợp lệ: '{target}'. Hợp lệ: {[s.value for s in AssessmentStatus]}.")
+    obj = await service.change_status(db, uuid.UUID(assessment_id), target_enum, version)
     data = AssessmentOut.model_validate(obj).model_dump(mode="json")
     return success_response(request, data)

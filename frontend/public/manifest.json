@@ -1,0 +1,16 @@
+{
+  "name": "BioSecurity OS 2026",
+  "short_name": "BiosecOS",
+  "description": "He thong kiem soat an toan sinh hoc",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e6f42",
+  "icons": [
+    {
+      "src": "/favico.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    }
+  ]
+}

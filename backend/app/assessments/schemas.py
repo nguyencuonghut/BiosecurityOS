@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.assessments.models import AssessmentType
+from app.assessments.models import AssessmentType, AssessmentStatus
 
 # Vietnamese labels — mapping thực hiện tại BE
 ASSESSMENT_TYPE_LABELS: dict[str, str] = {
@@ -15,6 +15,13 @@ ASSESSMENT_TYPE_LABELS: dict[str, str] = {
     AssessmentType.SPOT: "Đánh giá đột xuất",
     AssessmentType.BLIND: "Đánh giá ẩn danh",
     AssessmentType.INCIDENT_REVIEW: "Đánh giá sau sự cố",
+}
+
+ASSESSMENT_STATUS_LABELS: dict[str, str] = {
+    AssessmentStatus.DRAFT: "Nháp",
+    AssessmentStatus.SUBMITTED: "Đã gửi",
+    AssessmentStatus.REVIEWED: "Đã duyệt",
+    AssessmentStatus.LOCKED: "Đã khóa",
 }
 
 
@@ -99,7 +106,7 @@ class AssessmentOut(BaseModel):
     process_score: Decimal | None
     behavior_score: Decimal | None
     monitoring_score: Decimal | None
-    status: str
+    status: AssessmentStatus
     summary_note: str | None
     trust_gap_basis_id: uuid.UUID | None
     version: int
@@ -111,6 +118,12 @@ class AssessmentOut(BaseModel):
     def assessment_type_label(self) -> str:
         """Nhãn tiếng Việt được map tại BE."""
         return ASSESSMENT_TYPE_LABELS.get(self.assessment_type, self.assessment_type.value)
+
+    @computed_field
+    @property
+    def status_label(self) -> str:
+        """Nhãn trạng thái tiếng Việt được map tại BE."""
+        return ASSESSMENT_STATUS_LABELS.get(self.status, self.status.value)
 
 
 class AssessmentDetailOut(AssessmentOut):

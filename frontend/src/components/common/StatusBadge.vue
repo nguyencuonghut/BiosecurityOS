@@ -4,6 +4,7 @@ import { computed } from 'vue'
 
 const props = defineProps({
   value: { type: String, required: true },
+  label: { type: String, default: null },  // override label từ BE (vd: status_label)
   type: { type: String, default: 'status' }, // status | risk | confidence | clean_dirty
 })
 
@@ -40,16 +41,16 @@ const severityMap = {
 
 const labelMap = {
   status: {
-    active: 'Hoạt động',
-    paused: 'Tạm dừng',
-    closed: 'Đã đóng',
-    archived: 'Lưu trữ',
-    locked: 'Khóa',
-    inactive: 'Ngừng',
-    draft: 'Nháp',
-    submitted: 'Đã nộp',
-    reviewed: 'Đã duyệt',
-    open: 'Mở',
+    active:    'Hoạt động',
+    paused:    'Tạm dừng',
+    closed:    'Đã đóng',
+    archived:  'Lưu trữ',
+    locked:    'Đã khóa',
+    inactive:  'Ngừng',
+    draft:     'Nháp',
+    submitted: 'Đã gửi',
+    reviewed:  'Đã duyệt',
+    open:      'Mở',
   },
   risk: {
     low: 'Thấp',
@@ -70,7 +71,7 @@ const labelMap = {
 }
 
 const severity = computed(() => severityMap[props.type]?.[props.value] || 'secondary')
-const label = computed(() => labelMap[props.type]?.[props.value] || props.value)
+const label = computed(() => props.label ?? labelMap[props.type]?.[props.value] ?? props.value)
 </script>
 
 <template>

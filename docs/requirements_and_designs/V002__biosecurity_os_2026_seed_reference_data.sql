@@ -231,7 +231,7 @@ VALUES
     ('assessment_type','incident_review','Đánh giá sau sự cố',5,true,NULL),
     ('assessment_status','draft','Nháp',1,true,NULL),
     ('assessment_status','submitted','Đã gửi',2,true,NULL),
-    ('assessment_status','reviewed','Đã review',3,true,NULL),
+    ('assessment_status','reviewed','Đã duyệt',3,true,NULL),
     ('assessment_status','locked','Đã khóa',4,true,NULL),
     ('confidence_level','suspected','Nghi ngờ',1,true,NULL),
     ('confidence_level','probable','Khả năng cao',2,true,NULL),

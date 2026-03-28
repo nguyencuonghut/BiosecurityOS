@@ -223,7 +223,7 @@ function goPrevSection() {
           <div>
             <h2>{{ assessment.farm_name_snapshot || assessment.performed_by_name_snapshot || 'Đánh giá' }}</h2>
             <div class="header-meta">
-              <StatusBadge :value="assessment.status" />
+              <StatusBadge :value="assessment.status" :label="assessment.status_label" />
               <Tag :value="assessment.assessment_type_label || assessment.assessment_type" severity="secondary" rounded />
               <span class="meta-divider">|</span>
               <span><i class="pi pi-calendar" /> {{ new Date(assessment.assessment_date).toLocaleDateString('vi-VN') }}</span>

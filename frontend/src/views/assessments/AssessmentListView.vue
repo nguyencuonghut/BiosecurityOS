@@ -30,10 +30,10 @@ const typeOptions = [
 ]
 
 const statusOptions = [
-  { label: 'Nháp', value: 'draft' },
-  { label: 'Đã nộp', value: 'submitted' },
-  { label: 'Đã duyệt', value: 'reviewed' },
-  { label: 'Khóa', value: 'locked' },
+  { label: 'Nháp',        value: 'draft' },
+  { label: 'Đã gửi',      value: 'submitted' },
+  { label: 'Đã duyệt',    value: 'reviewed' },
+  { label: 'Đã khóa',     value: 'locked' },
 ]
 
 onMounted(async () => {
@@ -183,7 +183,7 @@ function openDetail(row) {
       </Column>
       <Column field="status" header="Trạng thái" style="width: 10%">
         <template #body="{ data }">
-          <StatusBadge :value="data.status" />
+          <StatusBadge :value="data.status" :label="data.status_label" />
         </template>
       </Column>
       <Column header="" style="width: 8%">

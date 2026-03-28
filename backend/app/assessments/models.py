@@ -34,6 +34,15 @@ class AssessmentType(str, enum.Enum):
     INCIDENT_REVIEW = "incident_review"
 
 
+class AssessmentStatus(str, enum.Enum):
+    """Trạng thái phếu đánh giá."""
+
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    REVIEWED = "reviewed"
+    LOCKED = "locked"
+
+
 class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "assessment"
 
@@ -48,7 +57,8 @@ class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             AssessmentType,
             name="assessment_type_enum",
             schema="biosec",
-            create_type=False,  # managed by Alembic migration 0012
+            create_type=False,  # managed by V001 init schema
+            values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
     )
@@ -66,7 +76,17 @@ class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     behavior_score: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     monitoring_score: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
 
-    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="draft")
+    status: Mapped[AssessmentStatus] = mapped_column(
+        SAEnum(
+            AssessmentStatus,
+            name="assessment_status_enum",
+            schema="biosec",
+            create_type=False,  # managed by V001 init schema
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        server_default=text("'draft'"),
+    )
     summary_note: Mapped[str | None] = mapped_column(Text)
     trust_gap_basis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     version: Mapped[int] = mapped_column(

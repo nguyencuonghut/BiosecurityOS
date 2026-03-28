@@ -413,7 +413,7 @@ Bảng phiếu đánh giá hoặc audit.
 | process_score | numeric(8,2) | Không | Điểm nhóm quy trình. |
 | behavior_score | numeric(8,2) | Không | Điểm nhóm hành vi/kỷ luật. |
 | monitoring_score | numeric(8,2) | Không | Điểm nhóm giám sát/phát hiện. |
-| status | varchar(30) | Có | Trạng thái phiếu đánh giá: nháp, đã gửi, đã review, đã khóa. |
+| status | assessment_status_enum | Có | Trạng thái phiếu đánh giá (PostgreSQL ENUM): draft \| submitted \| reviewed \| locked |
 | summary_note | text | Không | Nhận xét tổng hợp của người đánh giá hoặc reviewer. |
 | trust_gap_basis_id | uuid | Không | Tham chiếu tới phiếu audit đối chiếu để tính trust gap nếu có. |
 | created_at | timestamptz | Có | Thời điểm hệ thống tạo bản ghi. |

@@ -323,6 +323,9 @@ CREATE TABLE biosec.scorecard_item (
 CREATE TYPE biosec.assessment_type_enum AS ENUM (
     'self', 'scheduled_audit', 'spot', 'blind', 'incident_review'
 );
+CREATE TYPE biosec.assessment_status_enum AS ENUM (
+    'draft', 'submitted', 'reviewed', 'locked'
+);
 
 CREATE TABLE biosec.assessment (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -337,7 +340,7 @@ CREATE TABLE biosec.assessment (
     process_score numeric(8,2),
     behavior_score numeric(8,2),
     monitoring_score numeric(8,2),
-    status varchar(30) DEFAULT 'draft' NOT NULL,
+    status biosec.assessment_status_enum DEFAULT 'draft' NOT NULL,
     summary_note text,
     trust_gap_basis_id uuid,
     version integer DEFAULT 1 NOT NULL,
@@ -348,7 +351,6 @@ CREATE TABLE biosec.assessment (
     CONSTRAINT ck_assessment_4 CHECK (process_score IS NULL OR (process_score >= 0 AND process_score <= 100)),
     CONSTRAINT ck_assessment_5 CHECK (behavior_score IS NULL OR (behavior_score >= 0 AND behavior_score <= 100)),
     CONSTRAINT ck_assessment_6 CHECK (monitoring_score IS NULL OR (monitoring_score >= 0 AND monitoring_score <= 100)),
-    CONSTRAINT ck_assessment_7 CHECK (status IN ('draft','submitted','reviewed','locked')),
     CONSTRAINT ck_assessment_8 CHECK (trust_gap_basis_id IS NULL OR trust_gap_basis_id <> id)
 );
 
@@ -914,7 +916,7 @@ COMMENT ON COLUMN biosec.assessment.hardware_score IS $$ Điểm nhóm hạ tầ
 COMMENT ON COLUMN biosec.assessment.process_score IS $$ Điểm nhóm quy trình. $$;
 COMMENT ON COLUMN biosec.assessment.behavior_score IS $$ Điểm nhóm hành vi/kỷ luật. $$;
 COMMENT ON COLUMN biosec.assessment.monitoring_score IS $$ Điểm nhóm giám sát/phát hiện. $$;
-COMMENT ON COLUMN biosec.assessment.status IS $$ Trạng thái phiếu đánh giá: nháp, đã gửi, đã review, đã khóa. $$;
+COMMENT ON COLUMN biosec.assessment.status IS $$ Trạng thái phiếu đánh giá (PostgreSQL ENUM: assessment_status_enum): draft | submitted | reviewed | locked $$;
 COMMENT ON COLUMN biosec.assessment.summary_note IS $$ Nhận xét tổng hợp của người đánh giá hoặc reviewer. $$;
 COMMENT ON COLUMN biosec.assessment.trust_gap_basis_id IS $$ Tham chiếu tới phiếu audit đối chiếu để tính trust gap nếu có. $$;
 COMMENT ON COLUMN biosec.assessment.created_at IS $$ Thời điểm hệ thống tạo bản ghi. $$;
