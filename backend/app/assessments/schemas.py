@@ -4,7 +4,18 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from app.assessments.models import AssessmentType
+
+# Vietnamese labels — mapping thực hiện tại BE
+ASSESSMENT_TYPE_LABELS: dict[str, str] = {
+    AssessmentType.SELF: "Tự đánh giá",
+    AssessmentType.SCHEDULED_AUDIT: "Đánh giá định kỳ",
+    AssessmentType.SPOT: "Đánh giá đột xuất",
+    AssessmentType.BLIND: "Đánh giá ẩn danh",
+    AssessmentType.INCIDENT_REVIEW: "Đánh giá sau sự cố",
+}
 
 
 # ── Assessment Item Result ──────────────────────────────────────
@@ -62,16 +73,12 @@ class AssessmentAttachmentOut(BaseModel):
 class AssessmentCreate(BaseModel):
     farm_id: uuid.UUID
     template_id: uuid.UUID
-    assessment_type: str = Field(
-        pattern=r"^(self|scheduled_audit|spot|blind|incident_review)$"
-    )
+    assessment_type: AssessmentType
     assessment_date: datetime | None = None
 
 
 class AssessmentUpdate(BaseModel):
-    assessment_type: str | None = Field(
-        default=None, pattern=r"^(self|scheduled_audit|spot|blind|incident_review)$"
-    )
+    assessment_type: AssessmentType | None = None
     assessment_date: datetime | None = None
     summary_note: str | None = None
 
@@ -83,7 +90,7 @@ class AssessmentOut(BaseModel):
     farm_id: uuid.UUID
     farm_name: str | None = None
     template_id: uuid.UUID
-    assessment_type: str
+    assessment_type: AssessmentType
     assessment_date: datetime
     performed_by_user_id: uuid.UUID
     performed_by_name_snapshot: str
@@ -98,6 +105,12 @@ class AssessmentOut(BaseModel):
     version: int
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def assessment_type_label(self) -> str:
+        """Nhãn tiếng Việt được map tại BE."""
+        return ASSESSMENT_TYPE_LABELS.get(self.assessment_type, self.assessment_type.value)
 
 
 class AssessmentDetailOut(AssessmentOut):

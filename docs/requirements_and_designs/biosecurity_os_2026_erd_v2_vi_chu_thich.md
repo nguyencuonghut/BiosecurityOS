@@ -404,7 +404,7 @@ Bảng phiếu đánh giá hoặc audit.
 | id | uuid | Có | Khóa chính (PK) của bảng. |
 | farm_id | uuid | Có | Trại được đánh giá. |
 | template_id | uuid | Có | Mẫu scorecard được sử dụng cho phiếu đánh giá này. |
-| assessment_type | varchar(30) | Có | Loại đánh giá: tự đánh giá, audit định kỳ, spot, blind... |
+| assessment_type | assessment_type_enum | Có | Loại đánh giá (PostgreSQL ENUM): self \| scheduled_audit \| spot \| blind \| incident_review |
 | assessment_date | timestamptz | Có | Thời điểm thực hiện đánh giá. |
 | performed_by_user_id | uuid | Có | Người trực tiếp thực hiện đánh giá. |
 | performed_by_name_snapshot | varchar(255) | Có | Tên người đánh giá được chụp lại tại thời điểm đó để tránh thay đổi lịch sử khi user đổi tên. |

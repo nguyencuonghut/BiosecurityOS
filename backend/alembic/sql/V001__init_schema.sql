@@ -318,11 +318,19 @@ CREATE TABLE biosec.scorecard_item (
 );
 
 -- assessment
+CREATE TYPE biosec.assessment_type_enum AS ENUM (
+    'self',
+    'scheduled_audit',
+    'spot',
+    'blind',
+    'incident_review'
+);
+
 CREATE TABLE biosec.assessment (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     farm_id uuid NOT NULL,
     template_id uuid NOT NULL,
-    assessment_type varchar(30) NOT NULL,
+    assessment_type biosec.assessment_type_enum NOT NULL,
     assessment_date timestamptz DEFAULT now() NOT NULL,
     performed_by_user_id uuid NOT NULL,
     performed_by_name_snapshot varchar(255) NOT NULL,
@@ -337,7 +345,6 @@ CREATE TABLE biosec.assessment (
     version integer DEFAULT 1 NOT NULL,
     created_at timestamptz DEFAULT now() NOT NULL,
     updated_at timestamptz DEFAULT now() NOT NULL,
-    CONSTRAINT ck_assessment_1 CHECK (assessment_type IN ('self','scheduled_audit','spot','blind','incident_review')),
     CONSTRAINT ck_assessment_2 CHECK (overall_score IS NULL OR (overall_score >= 0 AND overall_score <= 100)),
     CONSTRAINT ck_assessment_3 CHECK (hardware_score IS NULL OR (hardware_score >= 0 AND hardware_score <= 100)),
     CONSTRAINT ck_assessment_4 CHECK (process_score IS NULL OR (process_score >= 0 AND process_score <= 100)),
@@ -892,7 +899,7 @@ COMMENT ON TABLE biosec.assessment IS $$ Bảng phiếu đánh giá hoặc audit
 COMMENT ON COLUMN biosec.assessment.id IS $$ Khóa chính (PK) của bảng. $$;
 COMMENT ON COLUMN biosec.assessment.farm_id IS $$ Trại được đánh giá. $$;
 COMMENT ON COLUMN biosec.assessment.template_id IS $$ Mẫu scorecard được sử dụng cho phiếu đánh giá này. $$;
-COMMENT ON COLUMN biosec.assessment.assessment_type IS $$ Loại đánh giá: tự đánh giá, audit định kỳ, spot, blind... $$;
+COMMENT ON COLUMN biosec.assessment.assessment_type IS $$ Loại đánh giá (PostgreSQL ENUM: assessment_type_enum): self | scheduled_audit | spot | blind | incident_review $$;
 COMMENT ON COLUMN biosec.assessment.assessment_date IS $$ Thời điểm thực hiện đánh giá. $$;
 COMMENT ON COLUMN biosec.assessment.performed_by_user_id IS $$ Người trực tiếp thực hiện đánh giá. $$;
 COMMENT ON COLUMN biosec.assessment.performed_by_name_snapshot IS $$ Tên người đánh giá được chụp lại tại thời điểm đó để tránh thay đổi lịch sử khi user đổi tên. $$;

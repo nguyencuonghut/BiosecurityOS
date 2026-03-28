@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assessments import service
+from app.assessments.models import AssessmentType
 from app.assessments.schemas import (
     AssessmentAttachmentCreate,
     AssessmentAttachmentOut,
@@ -36,7 +37,7 @@ async def list_assessments(
     _user: CurrentUser,
     _perm: Annotated[None, require_permission("ASSESSMENT_READ")],
     farm_id: Annotated[str | None, Query()] = None,
-    assessment_type: Annotated[str | None, Query()] = None,
+    assessment_type: Annotated[AssessmentType | None, Query()] = None,
     status: Annotated[str | None, Query()] = None,
     date_from: Annotated[str | None, Query()] = None,
     date_to: Annotated[str | None, Query()] = None,

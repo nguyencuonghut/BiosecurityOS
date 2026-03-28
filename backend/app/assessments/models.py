@@ -1,5 +1,6 @@
 """ORM models for Assessment module (Sprint 03)."""
 
+import enum
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -7,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Enum as SAEnum,
     ForeignKey,
     Integer,
     Numeric,
@@ -22,6 +24,16 @@ from app.auth.models import Farm
 from app.models_base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
+class AssessmentType(str, enum.Enum):
+    """Loại đánh giá an toàn sinh học."""
+
+    SELF = "self"
+    SCHEDULED_AUDIT = "scheduled_audit"
+    SPOT = "spot"
+    BLIND = "blind"
+    INCIDENT_REVIEW = "incident_review"
+
+
 class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "assessment"
 
@@ -31,7 +43,15 @@ class Assessment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     template_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("biosec.scorecard_template.id"), nullable=False
     )
-    assessment_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    assessment_type: Mapped[AssessmentType] = mapped_column(
+        SAEnum(
+            AssessmentType,
+            name="assessment_type_enum",
+            schema="biosec",
+            create_type=False,  # managed by Alembic migration 0012
+        ),
+        nullable=False,
+    )
     assessment_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

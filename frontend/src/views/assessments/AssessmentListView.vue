@@ -22,11 +22,11 @@ const activeTemplates = ref([])
 const createForm = ref({ farm_id: null, template_id: null, assessment_type: null })
 
 const typeOptions = [
-  { label: 'Tự đánh giá', value: 'self' },
-  { label: 'Audit định kỳ', value: 'scheduled_audit' },
-  { label: 'Spot audit', value: 'spot' },
-  { label: 'Blind audit', value: 'blind' },
-  { label: 'Sau sự cố', value: 'incident_review' },
+  { label: 'Tự đánh giá',       value: 'self' },
+  { label: 'Đánh giá định kỳ', value: 'scheduled_audit' },
+  { label: 'Đánh giá đột xuất', value: 'spot' },
+  { label: 'Đánh giá ẩn danh',   value: 'blind' },
+  { label: 'Đánh giá sau sự cố', value: 'incident_review' },
 ]
 
 const statusOptions = [
@@ -68,10 +68,6 @@ function scoreClass(s) {
   if (n >= 80) return 'score-good'
   if (n >= 60) return 'score-warn'
   return 'score-bad'
-}
-
-function typeName(val) {
-  return typeOptions.find((o) => o.value === val)?.label || val
 }
 
 async function openCreateDialog() {
@@ -157,7 +153,7 @@ function openDetail(row) {
         <template #body="{ data }">{{ data.farm_name || '—' }}</template>
       </Column>
       <Column field="assessment_type" header="Loại" style="width: 12%">
-        <template #body="{ data }">{{ typeName(data.assessment_type) }}</template>
+        <template #body="{ data }">{{ data.assessment_type_label }}</template>
       </Column>
       <Column field="performed_by_name_snapshot" header="Người đánh giá" style="width: 16%" />
       <Column header="Điểm tổng" style="width: 8%">
