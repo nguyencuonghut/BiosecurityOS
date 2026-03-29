@@ -131,38 +131,38 @@ function displayY(m) {
 }
 
 // ── Marker icon & color mapping — 22 area_type codes ──────────
-// PrimeIcons (pi-*) — bundled with PrimeVue, always available
+// MDI icons (@mdi/font) — semantically matched to area types
 const markerConfig = {
-  gate:                  { icon: 'pi pi-sign-in',           color: '#64748b', label: 'Cổng' },
-  guardhouse:            { icon: 'pi pi-shield',            color: '#475569', label: 'Nhà bảo vệ' },
-  gate_disinfection:     { icon: 'pi pi-filter',            color: '#f59e0b', label: 'Sát trùng cổng' },
-  pre_barn_disinfection: { icon: 'pi pi-filter-fill',       color: '#d97706', label: 'Sát trùng trước chuồng' },
-  lime_pit:              { icon: 'pi pi-circle',            color: '#84cc16', label: 'Hố vôi' },
-  footbath:              { icon: 'pi pi-sort-down',         color: '#22d3ee', label: 'Nơi nhúng tay chân' },
-  water_tank:            { icon: 'pi pi-cloud',             color: '#38bdf8', label: 'Bể nước' },
-  yard:                  { icon: 'pi pi-th-large',          color: '#a3a3a3', label: 'Sân' },
-  living_quarters:       { icon: 'pi pi-home',              color: '#6366f1', label: 'Khu sinh hoạt' },
-  feed_storage:          { icon: 'pi pi-box',               color: '#f97316', label: 'Kho cám' },
-  medicine_storage:      { icon: 'pi pi-heart',             color: '#ec4899', label: 'Kho thuốc' },
-  equipment_storage:     { icon: 'pi pi-wrench',            color: '#8b5cf6', label: 'Kho dụng cụ' },
-  kitchen:               { icon: 'pi pi-star',              color: '#fb923c', label: 'Bếp' },
-  weighbridge:           { icon: 'pi pi-arrows-h',          color: '#0ea5e9', label: 'Cầu cân' },
-  holding_pen:           { icon: 'pi pi-stop-circle',       color: '#94a3b8', label: 'Ô chờ' },
-  manure_press:          { icon: 'pi pi-arrow-down',        color: '#78716c', label: 'Nhà ép phân' },
-  biogas:                { icon: 'pi pi-bolt',              color: '#4ade80', label: 'Biogas' },
-  carcass_disposal:      { icon: 'pi pi-exclamation-circle',color: '#dc2626', label: 'Khu hủy xác heo' },
-  barn:                  { icon: 'pi pi-check-circle',      color: '#16a34a', label: 'Chuồng' },
-  toilet:                { icon: 'pi pi-user',              color: '#9ca3af', label: 'Nhà vệ sinh' },
-  shower:                { icon: 'pi pi-cloud-download',    color: '#0284c7', label: 'Nhà tắm' },
-  quarantine:            { icon: 'pi pi-ban',               color: '#ef4444', label: 'Khu cách ly' },
+  gate:                  { icon: 'mdi mdi-gate',                  color: '#64748b', label: 'Cổng' },
+  guardhouse:            { icon: 'mdi mdi-shield-home',           color: '#475569', label: 'Nhà bảo vệ' },
+  gate_disinfection:     { icon: 'mdi mdi-spray',                 color: '#f59e0b', label: 'Sát trùng cổng' },
+  pre_barn_disinfection: { icon: 'mdi mdi-spray-bottle',          color: '#d97706', label: 'Sát trùng trước chuồng' },
+  lime_pit:              { icon: 'mdi mdi-flask-outline',         color: '#84cc16', label: 'Hố vôi' },
+  footbath:              { icon: 'mdi mdi-shoe-print',            color: '#22d3ee', label: 'Nơi nhúng tay chân' },
+  water_tank:            { icon: 'mdi mdi-water-well',            color: '#38bdf8', label: 'Bể nước' },
+  yard:                  { icon: 'mdi mdi-terrain',               color: '#a3a3a3', label: 'Sân' },
+  living_quarters:       { icon: 'mdi mdi-home-account',          color: '#6366f1', label: 'Khu sinh hoạt' },
+  feed_storage:          { icon: 'mdi mdi-silo',                  color: '#f97316', label: 'Kho cám' },
+  medicine_storage:      { icon: 'mdi mdi-medical-bag',           color: '#ec4899', label: 'Kho thuốc' },
+  equipment_storage:     { icon: 'mdi mdi-toolbox',               color: '#8b5cf6', label: 'Kho dụng cụ' },
+  kitchen:               { icon: 'mdi mdi-chef-hat',              color: '#fb923c', label: 'Bếp' },
+  weighbridge:           { icon: 'mdi mdi-scale-balance',         color: '#0ea5e9', label: 'Cầu cân' },
+  holding_pen:           { icon: 'mdi mdi-fence',                 color: '#94a3b8', label: 'Ô chờ' },
+  manure_press:          { icon: 'mdi mdi-recycle',               color: '#78716c', label: 'Nhà ép phân' },
+  biogas:                { icon: 'mdi mdi-fire',                  color: '#4ade80', label: 'Biogas' },
+  carcass_disposal:      { icon: 'mdi mdi-skull-crossbones',      color: '#dc2626', label: 'Khu hủy xác heo' },
+  barn:                  { icon: 'mdi mdi-barn',                  color: '#16a34a', label: 'Chuồng' },
+  toilet:                { icon: 'mdi mdi-toilet',                color: '#9ca3af', label: 'Nhà vệ sinh' },
+  shower:                { icon: 'mdi mdi-shower-head',           color: '#0284c7', label: 'Nhà tắm' },
+  quarantine:            { icon: 'mdi mdi-biohazard',             color: '#ef4444', label: 'Khu cách ly' },
   // Legacy marker_type values used in seeder MARKER_TEMPLATES
-  disinfection:          { icon: 'pi pi-filter',            color: '#f59e0b', label: 'Sát trùng' },
-  dead_pig_zone:         { icon: 'pi pi-exclamation-circle',color: '#dc2626', label: 'Khu hủy xác' },
-  checkpoint:            { icon: 'pi pi-map-marker',        color: '#22c55e', label: 'Điểm kiểm tra' },
+  disinfection:          { icon: 'mdi mdi-spray',                 color: '#f59e0b', label: 'Sát trùng' },
+  dead_pig_zone:         { icon: 'mdi mdi-skull',                 color: '#dc2626', label: 'Khu hủy xác' },
+  checkpoint:            { icon: 'mdi mdi-map-marker-check',      color: '#22c55e', label: 'Điểm kiểm tra' },
 }
 
 function getMarkerIcon(type) {
-  return markerConfig[type]?.icon || 'pi pi-map-marker'
+  return markerConfig[type]?.icon || 'mdi mdi-map-marker'
 }
 
 function getMarkerColor(type) {
@@ -445,7 +445,7 @@ const markerLegendItems = computed(() => {
   background: var(--marker-color, var(--p-primary-color));
   color: #fff;
   border-radius: 50%;
-  font-size: 0.8rem;
+  font-size: 1.1rem;
   cursor: pointer;
   z-index: 2;
   transition: transform 0.15s, box-shadow 0.15s;
