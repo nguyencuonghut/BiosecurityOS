@@ -145,6 +145,7 @@ async def list_cases(
     offset = (page - 1) * page_size
     result = await db.execute(
         base.order_by(RiskCase.priority, RiskCase.opened_at.desc())
+        .options(selectinload(RiskCase.assigned_expert))
         .offset(offset)
         .limit(page_size)
     )
@@ -155,6 +156,7 @@ async def get_case(db: AsyncSession, case_id: uuid.UUID) -> RiskCase:
     result = await db.execute(
         select(RiskCase)
         .options(
+            selectinload(RiskCase.assigned_expert),
             selectinload(RiskCase.participants),
             selectinload(RiskCase.rca_records).selectinload(RcaRecord.factors),
         )

@@ -392,7 +392,7 @@ onMounted(async () => {
                 </div>
                 <div v-if="caseData.assigned_expert_user_id" class="expert-badge">
                   <Avatar icon="pi pi-user" shape="circle" class="expert-avatar" />
-                  <span class="expert-id">{{ caseData.assigned_expert_user_id.slice(0, 8) }}…</span>
+                  <span class="expert-name">{{ caseData.assigned_expert_name || caseData.assigned_expert_user_id.slice(0, 8) + '…' }}</span>
                 </div>
                 <div v-else class="empty-inline">
                   <i class="pi pi-user-minus"></i>
@@ -784,7 +784,7 @@ onMounted(async () => {
 :deep(.expert-avatar) {
   background: var(--p-teal-100); color: var(--p-teal-600);
 }
-.expert-id { font-size: 0.85rem; font-family: monospace; }
+.expert-name { font-size: 0.9rem; font-weight: 600; }
 
 .empty-inline {
   display: flex; align-items: center; gap: 0.5rem;

@@ -45,6 +45,9 @@ class RiskCase(UUIDPrimaryKeyMixin, TimestampMixin, VersionMixin, SoftDeleteMixi
     )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    assigned_expert: Mapped["AppUser | None"] = relationship(
+        "AppUser", foreign_keys=[assigned_expert_user_id], lazy="raise"
+    )
     participants: Mapped[list["CaseParticipant"]] = relationship(
         back_populates="case", cascade="all, delete-orphan"
     )

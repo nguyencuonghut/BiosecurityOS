@@ -47,6 +47,8 @@ async def list_cases(
         page_size=pagination.page_size,
     )
     data = [schemas.CaseOut.model_validate(c).model_dump(mode="json") for c in items]
+    for c, d in zip(items, data):
+        d["assigned_expert_name"] = c.assigned_expert.full_name if c.assigned_expert else None
     return paginated_response(request, data, total, pagination)
 
 
@@ -59,6 +61,7 @@ async def create_case(
 ):
     case = await service.create_case(db, payload, user.id)
     data = schemas.CaseOut.model_validate(case).model_dump(mode="json")
+    data["assigned_expert_name"] = case.assigned_expert.full_name if case.assigned_expert else None
     return success_response(request, data, status_code=201)
 
 
@@ -83,6 +86,7 @@ async def get_case(
 ):
     case = await service.get_case(db, case_id)
     data = schemas.CaseOut.model_validate(case).model_dump(mode="json")
+    data["assigned_expert_name"] = case.assigned_expert.full_name if case.assigned_expert else None
     return success_response(request, data, headers=etag_headers(case.version))
 
 
@@ -95,6 +99,7 @@ async def update_case(
 ):
     case = await service.update_case(db, case_id, payload)
     data = schemas.CaseOut.model_validate(case).model_dump(mode="json")
+    data["assigned_expert_name"] = case.assigned_expert.full_name if case.assigned_expert else None
     return success_response(request, data, headers=etag_headers(case.version))
 
 
@@ -107,6 +112,7 @@ async def assign_expert(
 ):
     case = await service.assign_expert(db, case_id, payload.expert_user_id)
     data = schemas.CaseOut.model_validate(case).model_dump(mode="json")
+    data["assigned_expert_name"] = case.assigned_expert.full_name if case.assigned_expert else None
     return success_response(request, data, headers=etag_headers(case.version))
 
 
@@ -119,6 +125,7 @@ async def change_status(
 ):
     case = await service.change_status(db, case_id, payload)
     data = schemas.CaseOut.model_validate(case).model_dump(mode="json")
+    data["assigned_expert_name"] = case.assigned_expert.full_name if case.assigned_expert else None
     return success_response(request, data, headers=etag_headers(case.version))
 
 

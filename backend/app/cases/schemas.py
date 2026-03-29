@@ -50,6 +50,7 @@ class CaseOut(BaseModel):
     severity: str
     current_status: str
     assigned_expert_user_id: uuid.UUID | None
+    assigned_expert_name: str | None = None
     first_response_due_at: datetime | None
     closure_due_at: datetime | None
     opened_at: datetime
