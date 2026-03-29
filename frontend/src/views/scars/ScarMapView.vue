@@ -213,52 +213,40 @@ function selectedFarmName() {
 
     <!-- Filters bar -->
     <div class="filter-bar">
-      <div class="filter-item">
-        <label>Trại</label>
-        <Select
-          v-model="selectedFarmId"
-          :options="farms"
-          optionLabel="name"
-          optionValue="id"
-          placeholder="Chọn trại"
-          class="filter-select"
-          filter
-        />
-      </div>
-      <div class="filter-item">
-        <label>Loại scar</label>
-        <Select
-          v-model="filterScarType"
-          :options="scarTypeOptions"
-          optionLabel="label"
-          optionValue="value"
-          placeholder="Tất cả"
-          class="filter-select"
-        />
-      </div>
-      <div class="filter-item">
-        <label>Độ tin cậy</label>
-        <Select
-          v-model="filterConfidence"
-          :options="confidenceOptions"
-          optionLabel="label"
-          optionValue="value"
-          placeholder="Tất cả"
-          class="filter-select"
-        />
-      </div>
-      <div class="filter-item">
-        <label>Khoảng ngày</label>
-        <DatePicker
-          v-model="filterDateRange"
-          selectionMode="range"
-          dateFormat="dd/mm/yy"
-          placeholder="Từ — Đến"
-          class="filter-select"
-          :manualInput="false"
-          showButtonBar
-        />
-      </div>
+      <Select
+        v-model="selectedFarmId"
+        :options="farms"
+        optionLabel="name"
+        optionValue="id"
+        placeholder="Trại"
+        class="filter-select"
+        filter
+      />
+      <Select
+        v-model="filterScarType"
+        :options="scarTypeOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Loại scar"
+        class="filter-select"
+      />
+      <Select
+        v-model="filterConfidence"
+        :options="confidenceOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Độ tin cậy"
+        class="filter-select"
+      />
+      <DatePicker
+        v-model="filterDateRange"
+        selectionMode="range"
+        dateFormat="dd/mm/yy"
+        placeholder="Khoảng ngày"
+        class="filter-select"
+        :manualInput="false"
+        showButtonBar
+      />
     </div>
 
     <!-- Main content: Canvas + Scar list -->
@@ -379,28 +367,12 @@ function selectedFarmName() {
 /* ── Filter bar ──────────────────────────────────────── */
 .filter-bar {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  align-items: flex-end;
-  padding: 0.75rem 1rem;
-  background: var(--p-surface-50);
-  border: 1px solid var(--p-surface-200);
-  border-radius: var(--p-border-radius);
-}
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 160px;
-}
-.filter-item label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--p-text-muted-color);
-  text-transform: uppercase;
+  margin-bottom: 0.25rem;
 }
 .filter-select {
-  width: 100%;
+  min-width: 160px;
 }
 
 /* ── Map content ─────────────────────────────────────── */
