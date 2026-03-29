@@ -105,9 +105,9 @@ async function handleSaveSection() {
     await store.saveSection(templateId.value, sectionForm.value, editingSectionId.value)
     showSectionDialog.value = false
     await store.fetchTemplate(templateId.value)
-    toast.add({ severity: 'success', summary: 'Đã lưu section', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Đã lưu phần đánh giá', life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Lỗi lưu section', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Lỗi lưu phần đánh giá', life: 5000 })
   }
 }
 
@@ -142,15 +142,15 @@ async function handleSaveItem() {
     await store.saveItem(activeSection.value.id, itemForm.value, editingItemId.value)
     showItemDialog.value = false
     await store.fetchTemplate(templateId.value)
-    toast.add({ severity: 'success', summary: 'Đã lưu item', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Đã lưu tiêu chí', life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Lỗi lưu item', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Lỗi lưu tiêu chí', life: 5000 })
   }
 }
 
 function confirmDeleteItem(section, item) {
   confirm.require({
-    message: `Xóa item "${item.code}" ?`,
+    message: `Xóa tiêu chí "${item.code}"?`,
     header: 'Xác nhận xóa',
     icon: 'pi pi-trash',
     acceptClass: 'p-button-danger',
@@ -160,7 +160,7 @@ function confirmDeleteItem(section, item) {
         await store.fetchTemplate(templateId.value)
         toast.add({ severity: 'info', summary: 'Đã xóa', life: 3000 })
       } catch (e) {
-        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể xóa item', life: 5000 })
+        toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể xóa tiêu chí', life: 5000 })
       }
     },
   })
@@ -193,8 +193,8 @@ async function handleClone() {
   try {
     const src = store.currentTemplate
     const cloned = await scorecardService.createTemplate({
-      code: src.code + '-COPY',
-      name: src.name + ' (Clone)',
+      code: src.code + '-SAO',
+      name: src.name + ' (Nhân bản)',
       farm_type: src.farm_type,
       ownership_type: src.ownership_type,
       risk_profile: src.risk_profile,
@@ -226,10 +226,10 @@ async function handleClone() {
         })
       }
     }
-    toast.add({ severity: 'success', summary: 'Đã clone template', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Đã nhân bản mẫu', life: 3000 })
     router.push(`/scorecards/${cloned.id}`)
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Lỗi clone', detail: e.response?.data?.error?.message || 'Không thể clone', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Lỗi nhân bản', detail: e.response?.data?.error?.message || 'Không thể nhân bản', life: 5000 })
   }
 }
 </script>
@@ -247,7 +247,7 @@ async function handleClone() {
         <span class="version-tag">v{{ store.currentTemplate.version_no }}</span>
         <Button v-if="isDraft" label="Kích hoạt" icon="pi pi-check-circle" severity="success" size="small" @click="handleActivate" />
         <Button v-if="store.currentTemplate.status !== 'archived'" label="Lưu trữ" icon="pi pi-inbox" severity="warn" size="small" @click="handleArchive" />
-        <Button label="Clone" icon="pi pi-copy" severity="secondary" size="small" @click="handleClone" />
+        <Button label="Nhân bản" icon="pi pi-copy" severity="secondary" size="small" @click="handleClone" />
       </div>
     </div>
 
@@ -267,7 +267,7 @@ async function handleClone() {
             </span>
             <span class="section-meta">
               Trọng số: <strong>{{ section.weight }}</strong>
-              &nbsp;|&nbsp; {{ section.items?.length || 0 }} items
+              &nbsp;|&nbsp; {{ section.items?.length || 0 }} tiêu chí
             </span>
           </div>
         </template>
@@ -282,9 +282,9 @@ async function handleClone() {
           <Column field="response_type" header="Loại" style="width: 8rem">
             <template #body="{ data }">{{ responseTypeLabel(data.response_type) }}</template>
           </Column>
-          <Column field="max_score" header="Max" style="width: 4rem" />
-          <Column field="weight" header="Wt" style="width: 4rem" />
-          <Column header="Killer" style="width: 10rem">
+          <Column field="max_score" header="Tối đa" style="width: 4rem" />
+          <Column field="weight" header="T.số" style="width: 4rem" />
+          <Column header="Killer Metric" style="width: 10rem">
             <template #body="{ data }">
               <button
                 v-if="data.is_killer_related && data.killer_metric_definition_id"
@@ -305,7 +305,7 @@ async function handleClone() {
         </DataTable>
 
         <div v-if="isDraft" class="mt-2">
-          <Button label="Thêm item" icon="pi pi-plus" text size="small" @click="openAddItem(section)" />
+          <Button label="Thêm tiêu chí" icon="pi pi-plus" text size="small" @click="openAddItem(section)" />
         </div>
       </Panel>
     </div>
@@ -343,7 +343,7 @@ async function handleClone() {
     </Dialog>
 
     <!-- Item Dialog -->
-    <Dialog v-model:visible="showItemDialog" :header="editingItemId ? 'Sửa item' : 'Thêm item'" :modal="true" style="width: 36rem">
+    <Dialog v-model:visible="showItemDialog" :header="editingItemId ? 'Sửa tiêu chí' : 'Thêm tiêu chí'" :modal="true" style="width: 36rem">
       <div class="dialog-form">
         <div class="field-row">
           <div class="field">

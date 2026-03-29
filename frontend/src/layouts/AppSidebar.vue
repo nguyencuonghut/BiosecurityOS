@@ -28,7 +28,7 @@ const navTree = computed(() => {
   const flat = [
     { label: 'Dashboard', icon: 'pi pi-chart-bar', to: '/', permission: null },
     { label: 'Trại', icon: 'pi pi-building', to: '/farms', permission: 'FARM_READ' },
-    { label: 'Scorecard', icon: 'pi pi-list', to: '/scorecards', permission: 'SCORECARD_READ' },
+    { label: 'Mẫu đánh giá', icon: 'pi pi-list', to: '/scorecards', permission: 'SCORECARD_READ' },
     { label: 'Đánh giá', icon: 'pi pi-clipboard', to: '/assessments', permission: 'ASSESSMENT_READ' },
     { label: 'Killer Metrics', icon: 'pi pi-bolt', to: '/killer-metrics/events', permission: 'KILLER_EVENT_READ' },
     { label: 'Cases', icon: 'pi pi-exclamation-triangle', to: '/cases', permission: 'CASE_CREATE' },

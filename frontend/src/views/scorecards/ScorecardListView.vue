@@ -81,9 +81,9 @@ async function handleCreate() {
     showCreateDialog.value = false
     resetForm()
     store.fetchTemplates()
-    toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã tạo template', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã tạo mẫu đánh giá', life: 3000 })
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Không thể tạo template', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: e.response?.data?.error?.message || 'Không thể tạo mẫu đánh giá', life: 5000 })
   }
 }
 
@@ -95,8 +95,8 @@ function openBuilder(row) {
 <template>
   <div class="scorecard-list">
     <div class="page-header">
-      <h2>Quản lý Scorecard Templates</h2>
-      <Button label="Tạo Template" icon="pi pi-plus" @click="showCreateDialog = true" />
+      <h2>Quản lý Mẫu đánh giá</h2>
+      <Button label="Tạo mẫu" icon="pi pi-plus" @click="showCreateDialog = true" />
     </div>
 
     <div class="filter-bar">
@@ -136,13 +136,13 @@ function openBuilder(row) {
           <a class="link" @click="openBuilder(data)">{{ data.code }}</a>
         </template>
       </Column>
-      <Column field="name" header="Tên template" style="width: 28%" />
+      <Column field="name" header="Tên mẫu" style="width: 28%" />
       <Column field="farm_type" header="Loại trại" style="width: 10%">
         <template #body="{ data }">
           {{ farmTypeOptions.find(o => o.value === data.farm_type)?.label || data.farm_type || '—' }}
         </template>
       </Column>
-      <Column field="version_no" header="Version" style="width: 8%" />
+      <Column field="version_no" header="Phiên bản" style="width: 8%" />
       <Column field="status" header="Trạng thái" style="width: 10%">
         <template #body="{ data }">
           <StatusBadge :value="data.status" />
@@ -160,7 +160,7 @@ function openBuilder(row) {
     </DataTable>
 
     <!-- Create Dialog -->
-    <Dialog v-model:visible="showCreateDialog" header="Tạo Scorecard Template" :modal="true" style="width: 32rem">
+    <Dialog v-model:visible="showCreateDialog" header="Tạo mẫu đánh giá" :modal="true" style="width: 32rem">
       <div class="form-grid">
         <div class="field">
           <label>Mã template *</label>
@@ -168,7 +168,7 @@ function openBuilder(row) {
         </div>
         <div class="field">
           <label>Tên *</label>
-          <InputText v-model="formData.name" placeholder="Tên template" class="w-full" />
+          <InputText v-model="formData.name" placeholder="Tên mẫu đánh giá" class="w-full" />
         </div>
         <div class="field">
           <label>Loại trại</label>
