@@ -21,6 +21,8 @@ const props = defineProps({
   ownershipType: { type: String, default: null },
 })
 
+const emit = defineEmits(['loaded'])
+
 const toast = useToast()
 const lessons = ref([])
 const total = ref(0)
@@ -37,11 +39,11 @@ async function loadLessons() {
   try {
     const params = { page_size: 50 }
     if (props.farmType) params.farm_type = props.farmType
-    if (props.ownershipType) params.ownership_type = props.ownershipType
 
     const result = await lessonService.searchSimilar(params)
     lessons.value = result.data || []
     total.value = result.meta?.total || 0
+    emit('loaded', total.value)
   } catch {
     toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải bài học', life: 3000 })
   } finally {

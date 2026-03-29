@@ -33,6 +33,7 @@ const trustScoreStore = useTrustScoreStore()
 const activeTab = ref('overview')
 const showEditDialog = ref(false)
 const floorplanCount = ref(0)
+const lessonCount = ref(0)
 
 const farm = computed(() => farmStore.currentFarm)
 
@@ -172,7 +173,7 @@ async function onSaved() {
         <Tab value="1">Lộ trình ({{ farmStore.routes.length }})</Tab>
         <Tab value="2">Điểm rủi ro ({{ farmStore.riskPoints.length }})</Tab>
         <Tab value="3">Floorplan ({{ floorplanCount }})</Tab>
-        <Tab value="4">Bài học</Tab>
+        <Tab value="4">Bài học ({{ lessonCount }})</Tab>
       </TabList>
       <TabPanels>
         <TabPanel value="overview">
@@ -191,7 +192,7 @@ async function onSaved() {
           <FarmFloorplanPanel :farmId="farm.id" />
         </TabPanel>
         <TabPanel value="4">
-          <FarmLessonPanel :farmId="farm.id" :farmType="farm.farm_type" :ownershipType="farm.ownership_type" />
+          <FarmLessonPanel :farmId="farm.id" :farmType="farm.farm_type" :ownershipType="farm.ownership_type" @loaded="lessonCount = $event" />
         </TabPanel>
       </TabPanels>
     </Tabs>
